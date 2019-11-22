@@ -27,8 +27,8 @@ private:
     callback_t on_disconnect_;
     callback_t on_read_{};
     callback_t on_write_{};
-    io_api::io_unit unit_{};
-    bool* destroyed_ = nullptr;
+    io_api::io_unit unit_;
+    bool *destroyed_ = nullptr;
 
 private:
     [[nodiscard]] uint32_t events_() const noexcept;
@@ -39,6 +39,7 @@ public:
     basic_socket(io_api::io_context& ctx, unique_fd&& fd, callback_t on_disconnect
                                                         , callback_t on_read
                                                         , callback_t on_write);
+    ~basic_socket();
 
     basic_socket(basic_socket const&) = delete;
     basic_socket& operator=(basic_socket const&) = delete;

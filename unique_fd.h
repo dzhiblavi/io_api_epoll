@@ -7,13 +7,14 @@
 
 #include <unistd.h>
 #include <algorithm>
+#include <iostream>
 
 class unique_fd {
     int fd_ = -1;
 
 public:
     unique_fd() noexcept = default;
-    unique_fd(int fd) noexcept;
+    explicit unique_fd(int fd) noexcept;
     ~unique_fd();
 
     unique_fd(unique_fd const&) = delete;

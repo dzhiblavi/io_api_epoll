@@ -12,7 +12,6 @@
 int main() {
     try {
         io_api::io_context ctx;
-
         ipv4::basic_socket sock = ipv4::basic_socket::connect(ctx, ipv4::endpoint(ipv4::address::resolve("codeforces.com"), 80), []{});
 
         std::stringstream req;

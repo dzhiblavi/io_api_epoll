@@ -12,7 +12,7 @@ namespace {
 uint32_t try_resolve(std::string const& host) {
     hostent* hst = gethostbyname(host.c_str());
     if (hst == nullptr || hst->h_addr == nullptr)
-        throw std::runtime_error("FAILED TO GET HOST ADDRESS");
+        IPV4_EXC_DEB("failed to resolve: " + host);
     uint32_t ret = 0;
     memcpy((char*)&ret, hst->h_addr, hst->h_length);
     return ret;

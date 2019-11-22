@@ -8,28 +8,17 @@
 #include "io_api.h"
 #include "basic_socket.h"
 #include "io_api.h"
+#include "echo_server.h"
 
-int main() {
+int main(int argc, char** argv) {
     try {
         io_api::io_context ctx;
-
-        ipv4::basic_server_socket serv1(ctx, ipv4::endpoint(ipv4::address::any(), 1239), [&serv1]{
-            std::cerr << "Server 1: connected" << std::endl;
-            serv1.accept([] {
-                std::cerr << "Server 1: disconnect" << std::endl;
-            });
-        });
-
-        ipv4::basic_server_socket serv2(ctx, ipv4::endpoint(ipv4::address::any(), 2239), [&serv2]{
-            std::cerr << "Server 2: connected" << std::endl;
-            serv2.accept([] {
-                std::cerr << "Server 2: disconnect" << std::endl;
-            });
-        });
-
+        ipv4::echo_server serv(ctx, ipv4::endpoint(ipv4::address::any(), atoi(argv[1])));
         ctx.exec();
+    } catch (ipv4::exception const& e) {
+        std::cerr << "main() failed: " << e.what() << std::endl;
     } catch (...) {
-        std::cout << "main() failed" << '\n';
+        std::cerr << "main() failed with unknown exception" << std::endl;
     }
     return 0;
 }

@@ -1,5 +1,5 @@
 //
-//  dzhiblavi
+// dzhiblavi
 //
 
 #ifndef WEB_CRACKER_IPV4_EXCEPTION_H
@@ -8,9 +8,16 @@
 #include <string>
 #include <stdexcept>
 
-#define IPV4_EXC_DEBUG(X) throw ipv4::exception(std::string("IPV4 EXC: ") + X \
+#define DEBUG
+#define IPV4_EXC_DEB(X) throw ipv4::exception(std::string("IPV4 EXC: ") + X \
                         + " in function: " + __func__ + "(...)" \
                         + " on line: " + std::to_string(__LINE__))
+
+#ifdef DEBUG
+#define IPV4_EXCEPTION(X) IPV4_EXC_DEB(X)
+#else
+#define IPV4_EXCEPTION(X) ipv4::throw_exception(X);
+#endif
 
 namespace ipv4 {
 class exception : std::runtime_error {

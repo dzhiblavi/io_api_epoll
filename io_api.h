@@ -11,6 +11,7 @@
 #include <functional>
 #include <array>
 #include <iostream>
+#include <cassert>
 
 #include "ipv4_exception.h"
 #include "unique_fd.h"
@@ -50,7 +51,6 @@ private:
     callback_t callback_{};
 
 public:
-    io_unit() noexcept = default;
     io_unit(io_context* ctx, uint32_t events, int fd, callback_t callback);
 
     io_unit(io_unit const&) = delete;
@@ -65,7 +65,8 @@ public:
     [[nodiscard]] io_context const* context() const noexcept;
 
     void reconf_events(uint32_t events);
-    void callback(uint32_t events) noexcept;
+    void configure_callback(callback_t) noexcept;
+    void callback(uint32_t events);
 
     friend void swap(io_unit&, io_unit&) noexcept;
 };

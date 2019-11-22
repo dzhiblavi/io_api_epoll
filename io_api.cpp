@@ -8,21 +8,21 @@ namespace {
 int api_epoll_create() {
     int efd = epoll_create(IPV4_EPOLL_MAX);
     if (efd < 0)
-        IPV4_EXC_DEBUG(std::to_string(errno));
+        IPV4_EXCEPTION(std::to_string(errno));
     return efd;
 }
 
 int api_epoll_wait(int efd, epoll_event* data, size_t size, int timeout) {
     int nfd = epoll_wait(efd, data, size, timeout);
     if (nfd < 0)
-        IPV4_EXC_DEBUG(std::to_string(errno));
+        IPV4_EXCEPTION(std::to_string(errno));
     return nfd;
 }
 
 void api_epoll_ctl(int efd, int op, int fd, epoll_event* event) {
     int r = epoll_ctl(efd, op, fd, event);
     if (r < 0)
-        IPV4_EXC_DEBUG(std::to_string(errno));
+        IPV4_EXCEPTION(std::to_string(errno));
 }
 }
 
@@ -40,7 +40,7 @@ void io_context::ep_modify_(int fd, epoll_event* event) {
 }
 
 io_context::io_context() {
-    efd_ = api_epoll_create();
+    efd_ = unique_fd(api_epoll_create());
 }
 
 io_context::io_context(io_context&& rhs) noexcept {
@@ -50,10 +50,6 @@ io_context::io_context(io_context&& rhs) noexcept {
 io_context& io_context::operator=(io_context&& rhs) noexcept {
     swap(*this, rhs);
     return *this;
-}
-
-void swap(io_context& a, io_context& b) noexcept {
-    std::swap(a.efd_, b.efd_);
 }
 
 void io_context::exec() {
@@ -66,6 +62,10 @@ void io_context::exec() {
     }
 }
 
+void swap(io_context& a, io_context& b) noexcept {
+    std::swap(a.efd_, b.efd_);
+}
+
 io_context* io_unit::context() noexcept {
     return ctx_;
 }
@@ -75,6 +75,8 @@ io_context const* io_unit::context() const noexcept {
 }
 
 void io_unit::reconf_events(uint32_t events) {
+    if (!ctx_)
+        return;
     events_ = events;
     epoll_event event{events_, this};
     ctx_->ep_modify_(fd_, &event);
@@ -100,17 +102,27 @@ io_unit& io_unit::operator=(io_api::io_unit&& rhs) noexcept {
 }
 
 io_unit::~io_unit() {
+    if (!ctx_)
+        return;
     epoll_event event{events_, this};
     ctx_->ep_remove_(fd_, &event);
 }
 
-void io_unit::callback(uint32_t events) noexcept {
+void io_unit::callback(uint32_t events) {
+    assert(callback_);
     callback_(events);
+}
+
+void io_unit::configure_callback(io_api::io_unit::callback_t fn) noexcept {
+    callback_.swap(fn);
 }
 
 void swap(io_unit& a, io_unit& b) noexcept {
     std::swap(a.ctx_, b.ctx_);
     std::swap(a.events_, b.events_);
+    std::swap(a.fd_, b.fd_);
     std::swap(a.callback_, b.callback_);
+    a.reconf_events(a.events_);
+    b.reconf_events(b.events_);
 }
 } // namespace io_api

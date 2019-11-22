@@ -13,10 +13,12 @@ set(REQ_FILES
         io_api.cpp
         io_api.h
         basic_socket.cpp
-        basic_socket.h)
+        basic_socket.h
+        echo_server.cpp
+        echo_server.h)
 
 add_executable(server main.cpp
         ${REQ_FILES})
 
-add_executable(client client.cpp
-        ${REQ_FILES} client.cpp)
+#add_executable(client client.cpp
+#        ${REQ_FILES})
