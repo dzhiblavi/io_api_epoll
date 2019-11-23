@@ -20,13 +20,35 @@ echo_server::client_conn_::client_conn_(echo_server* es)
             }
             , [this] {
                 std::cerr << "on_read()" << std::endl;
-                size_ = csock_.recv(buff, 1024);
-                csock_.set_on_write([this] {
-                    std::cerr << "on_write()" << std::endl;
-                    csock_.send(buff, size_);
-                    size_ = 0;
-                    csock_.set_on_write(std::function<void()>());
-                });
+                size_ = 0;
+                for (;;) {
+                    std::cerr << "A" << std::endl;
+                    int r = csock_.recv(buff + size_, 1024 - size_);
+                    std::cerr << "B" << std::endl;
+
+                    std::cerr << r << std::endl;
+                    if (r == 0 || (r < 0 && errno == EWOULDBLOCK)) {
+                        sent_ = 0;
+                        csock_.set_on_write([this] {
+                            std::cerr << "on_write()" << std::endl;
+                            for (;;) {
+                                int rr = csock_.send(buff + sent_, 1024 - sent_);
+
+                                if (rr == 0 || (rr < 0 && errno == EWOULDBLOCK)) {
+                                    csock_.set_on_write(std::function<void()>());
+                                    return;
+                                } else if (rr < 0) {
+                                    IPV4_EXC_DEB(std::to_string(errno));
+                                }
+                                sent_ += rr;
+                            }
+                        });
+                        return;
+                    } else if (r < 0) {
+                        IPV4_EXC_DEB(std::to_string(errno));
+                    }
+                    size_ += r;
+                }
             }
             , std::function<void()>()))
 {}

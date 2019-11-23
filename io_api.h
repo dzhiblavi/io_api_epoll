@@ -12,6 +12,7 @@
 #include <array>
 #include <iostream>
 #include <cassert>
+#include <csignal>
 
 #include "ipv4_exception.h"
 #include "unique_fd.h"
@@ -22,6 +23,7 @@ class io_context {
 
 private:
     unique_fd efd_;
+    volatile bool quit_ = false;
 
 private:
     void ep_add_(int, epoll_event*);

@@ -5,6 +5,13 @@
 #include "io_api.h"
 
 namespace {
+volatile bool* quit = nullptr;
+
+void signal_handler(int signal) {
+    assert(quit);
+    *quit = true;
+}
+
 int api_epoll_create() {
     int efd = epoll_create(IPV4_EPOLL_MAX);
     if (efd < 0)
@@ -14,8 +21,8 @@ int api_epoll_create() {
 
 int api_epoll_wait(int efd, epoll_event* data, size_t size, int timeout) {
     int nfd = epoll_wait(efd, data, size, timeout);
-    if (nfd < 0)
-        IPV4_EXCEPTION(std::to_string(errno));
+//    if (nfd < 0)
+//        IPV4_EXCEPTION(std::to_string(errno));
     return nfd;
 }
 
@@ -53,12 +60,28 @@ io_context& io_context::operator=(io_context&& rhs) noexcept {
 }
 
 void io_context::exec() {
+    quit = &quit_;
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
+    std::signal(SIGPIPE, SIG_IGN);
+
     std::array<epoll_event, IPV4_EPOLL_MAX> events{};
     for (;;) {
-        int nfd = api_epoll_wait(efd_.fd(), events.data(), events.size(), -1);
+        if (quit_)
+            return;
+
+        std::cerr << "wait()" << std::endl;
+        int nfd = api_epoll_wait(efd_.fd(), events.data(), events.size(), 1000);
+        if (nfd < 0) {
+            if (errno == EINTR)
+                nfd = 0;
+            else
+                IPV4_EXC_DEB(std::to_string(nfd));
+        }
+        std::cerr << "wait() ok" << std::endl;
 
         for (auto it = events.begin(); it != events.begin() + nfd; ++it)
-            static_cast<io_unit*>(it->data.ptr)->callback(it->events);
+            static_cast<io_unit *>(it->data.ptr)->callback(it->events);
     }
 }
 

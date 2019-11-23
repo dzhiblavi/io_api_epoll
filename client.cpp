@@ -6,39 +6,17 @@
 
 #include "address.h"
 #include "io_api.h"
-#include "basic_socket.h"
+#include "socket.h"
 #include "io_api.h"
+#include "http_request.h"
 
 int main() {
     try {
-        io_api::io_context ctx;
-        ipv4::basic_socket sock = ipv4::basic_socket::connect(ctx, ipv4::endpoint(ipv4::address::resolve("codeforces.com"), 80), []{});
-
-        std::stringstream req;
-        req << "GET /profile/dzhiblavi" << " HTTP/1.1\r\n"
-            << "Host: codeforces.com\r\n"
-            << "\r\n\r\n";
-        std::string reqs = req.str();
-
-        char buff[2048];
-        int total = 0;
-
-        sock.set_on_read([&]{
-            std::cerr << "READ" << std::endl;
-            int r = sock.recv(buff, 2048);
-            buff[r] = 0;
-            std::cout << buff << std::flush;
-        });
-
-        sock.set_on_write([&]{
-            std::cerr << "WRITE" << std::endl;
-            while (total < reqs.size())
-                total += sock.send(reqs.data() + total, reqs.size() - total);
-
-            sock.set_on_write(std::function<void()>());
-        });
-
-        ctx.exec();
+        http_request req("api.vk.com");
+        req.set_type("GET /method/users.get?user_id=102352294&access_token=4cbc7ce256bab708102fb44bb37c1def2e81460dd98ef81f8e9c846e2c1e04ead5891742e12a0e88c2b5c&v=5.52");
+        req.set_param("Host", "api.vk.com");
+        req.set_param("User-agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36");
+        std::cout << req.request();
     } catch (ipv4::exception const& e) {
         std::cerr << e.what() << std::endl;
     }

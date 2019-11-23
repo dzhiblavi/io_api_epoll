@@ -12,13 +12,13 @@ set(REQ_FILES
         ipv4_exception.h
         io_api.cpp
         io_api.h
-        basic_socket.cpp
-        basic_socket.h
+        socket.cpp
+        socket.h
         echo_server.cpp
         echo_server.h)
 
 add_executable(server main.cpp
         ${REQ_FILES})
 
-#add_executable(client client.cpp
-#        ${REQ_FILES})
+add_executable(client client.cpp
+        ${REQ_FILES} http_request.cpp http_request.h)
