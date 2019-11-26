@@ -28,6 +28,8 @@ echo_server::client_conn_::client_conn_(echo_server* es)
 
                     std::cerr << r << std::endl;
                     if (r == 0 || (r < 0 && errno == EWOULDBLOCK)) {
+                        if (r < 0)
+                            std::cerr << "on_read() EWOULDBLOCK" << std::endl;
                         sent_ = 0;
                         csock_.set_on_write([this] {
                             std::cerr << "on_write()" << std::endl;
@@ -35,6 +37,8 @@ echo_server::client_conn_::client_conn_(echo_server* es)
                                 int rr = csock_.send(buff + sent_, 1024 - sent_);
 
                                 if (rr == 0 || (rr < 0 && errno == EWOULDBLOCK)) {
+                                    if (rr < 0)
+                                        std::cerr << "on_write() EWOULDBLOCK" << std::endl;
                                     csock_.set_on_write(std::function<void()>());
                                     return;
                                 } else if (rr < 0) {

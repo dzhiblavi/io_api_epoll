@@ -6,7 +6,7 @@
 
 namespace {
 int sock_create(int domain, int type, int proto) {
-    int s = socket(domain, type, proto);
+    int s = socket(domain, type | SOCK_NONBLOCK, proto);
     if (s < 0)
         IPV4_EXCEPTION(std::to_string(errno));
     return s;
@@ -14,15 +14,15 @@ int sock_create(int domain, int type, int proto) {
 
 int sock_recv(int sockfd, void* buff, size_t maxlen) {
     int r = recv(sockfd, buff, maxlen, 0);
-    if (r < 0)
-        IPV4_EXCEPTION(std::to_string(errno));
+//    if (r < 0)
+//        IPV4_EXCEPTION(std::to_string(errno));
     return r;
 }
 
 int sock_send(int sockfd, void const* buff, size_t len) {
     int r = send(sockfd, buff, len, 0);
-    if (r < 0)
-        IPV4_EXCEPTION(std::to_string(errno));
+//    if (r < 0)
+//        IPV4_EXCEPTION(std::to_string(errno));
     return r;
 }
 
@@ -77,7 +77,7 @@ basic_socket::basic_socket(unique_fd&& fd)
 {}
 
 basic_socket::basic_socket(endpoint const& ep)
-    : fd_(sock_create(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0))
+    : fd_(sock_create(AF_INET, SOCK_STREAM, 0))
 {
     sock_connect(fd_.fd(), ep);
 }
@@ -167,7 +167,7 @@ void socket::set_on_write(callback_t on_write) {
 }
 
 socket socket::connect(io_api::io_context& ctx, endpoint const& ep, callback_t const& on_disconnect) {
-    unique_fd fd = unique_fd(sock_create(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0));
+    unique_fd fd = unique_fd(sock_create(AF_INET, SOCK_STREAM, 0));
     sock_connect(fd.fd(), ep);
     return socket(ctx, std::move(fd), on_disconnect);
 }
@@ -184,7 +184,7 @@ void swap(socket& a, socket& b) noexcept {
 }
 
 server_socket::server_socket(io_api::io_context& ctx, endpoint const& addr, callback_t on_connected)
-    : fd_(sock_create(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0))
+    : fd_(sock_create(AF_INET, SOCK_STREAM, 0))
     , on_connected_(std::move(on_connected))
     , unit_(&ctx, EPOLLIN, fd_.fd(), [this](uint32_t flags) {
         if (flags == EPOLLIN)

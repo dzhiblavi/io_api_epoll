@@ -21,8 +21,6 @@ int api_epoll_create() {
 
 int api_epoll_wait(int efd, epoll_event* data, size_t size, int timeout) {
     int nfd = epoll_wait(efd, data, size, timeout);
-//    if (nfd < 0)
-//        IPV4_EXCEPTION(std::to_string(errno));
     return nfd;
 }
 
