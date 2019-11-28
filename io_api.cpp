@@ -5,11 +5,18 @@
 #include "io_api.h"
 
 namespace {
-volatile bool* quit = nullptr;
+//volatile bool* quit = nullptr;
 
-void signal_handler(int signal) {
-    assert(quit);
-    *quit = true;
+//void signal_handler(int signal) {
+//    assert(quit);
+//    *quit = true;
+//}
+//volatile io_api::event_notifier* evn = nullptr;
+volatile int evn = -1;
+
+void signal_handler(int) {
+    if (evn == -1) return;
+    ::eventfd_write(evn, 0);
 }
 
 int api_epoll_create() {
@@ -58,29 +65,42 @@ io_context& io_context::operator=(io_context&& rhs) noexcept {
 }
 
 void io_context::exec() {
-    quit = &quit_;
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
     std::signal(SIGPIPE, SIG_IGN);
 
+    epoll_event notifier{};
+    evn = eventfd(0, 0);
+    if (evn < 0)
+        IPV4_EXC_DEB(std::to_string(errno));
+    notifier.events = EPOLLIN;
+    notifier.data.fd = evn;
+    ep_add_(evn, &notifier);
+
+    unique_fd event_uq(evn);
     std::array<epoll_event, IPV4_EPOLL_MAX> events{};
     for (;;) {
-        if (quit_)
-            return;
-
-        std::cerr << "wait()" << std::endl;
+//        std::cerr << "wait()" << std::endl;
         int nfd = api_epoll_wait(efd_.fd(), events.data(), events.size(), 1000);
         if (nfd < 0) {
-            if (errno == EINTR)
-                nfd = 0;
-            else
+            if (errno == EINTR) {
+                goto end;
+            } else {
                 IPV4_EXC_DEB(std::to_string(nfd));
+            }
         }
-        std::cerr << "wait() ok" << std::endl;
+//        std::cerr << "wait() ok" << std::endl;
 
-        for (auto it = events.begin(); it != events.begin() + nfd; ++it)
+        for (auto it = events.begin(); it != events.begin() + nfd; ++it) {
+            if (it->data.fd == evn)
+                goto end;
             static_cast<io_unit *>(it->data.ptr)->callback(it->events);
+        }
     }
+
+end:
+    std::cerr << "FINISH" << std::endl;
+    evn = -1;
 }
 
 void swap(io_context& a, io_context& b) noexcept {

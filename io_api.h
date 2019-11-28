@@ -8,6 +8,7 @@
 #define IPV4_EPOLL_MAX 2000
 
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <functional>
 #include <array>
 #include <iostream>
@@ -23,7 +24,6 @@ class io_context {
 
 private:
     unique_fd efd_;
-    volatile bool quit_ = false;
 
 private:
     void ep_add_(int, epoll_event*);
