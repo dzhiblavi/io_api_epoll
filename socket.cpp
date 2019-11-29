@@ -13,17 +13,11 @@ int sock_create(int domain, int type, int proto) {
 }
 
 int sock_recv(int sockfd, void* buff, size_t maxlen) {
-    int r = recv(sockfd, buff, maxlen, 0);
-//    if (r < 0)
-//        IPV4_EXCEPTION(std::to_string(errno));
-    return r;
+    return recv(sockfd, buff, maxlen, 0);
 }
 
 int sock_send(int sockfd, void const* buff, size_t len) {
-    int r = send(sockfd, buff, len, 0);
-//    if (r < 0)
-//        IPV4_EXCEPTION(std::to_string(errno));
-    return r;
+    return send(sockfd, buff, len, 0);
 }
 
 void sock_connect(int fd, ipv4::endpoint const& ep) {
@@ -64,8 +58,8 @@ int sock_accept(int fd) {
 }
 
 namespace ipv4 {
-int basic_socket::recv(void* buff, size_t maxlen) {
-    return sock_recv(fd_.fd(), buff, maxlen);
+int basic_socket::recv(void* buff, size_t max_len) {
+    return sock_recv(fd_.fd(), buff, max_len);
 }
 
 int basic_socket::send(void const* buff, size_t len) {
@@ -123,8 +117,8 @@ socket::socket(io_api::io_context& ctx, unique_fd&& fd, callback_t on_disconnect
 {}
 
 socket::socket(io_api::io_context& ctx, unique_fd&& fd, callback_t on_disconnect
-                                                                  , callback_t on_read
-                                                                  , callback_t on_write)
+                                                      , callback_t on_read
+                                                      , callback_t on_write)
     : basic_socket(std::move(fd))
     , on_disconnect_(std::move(on_disconnect))
     , on_read_(std::move(on_read))
@@ -158,16 +152,16 @@ socket& socket::operator=(ipv4::socket&& rhs) noexcept {
 
 void socket::set_on_read(callback_t on_read) {
     on_read_.swap(on_read);
-    unit_.reconf_events(events_());
+    unit_.reconfigure_events(events_());
 }
 
 void socket::set_on_write(callback_t on_write) {
     on_write_.swap(on_write);
-    unit_.reconf_events(events_());
+    unit_.reconfigure_events(events_());
 }
 
 socket socket::connect(io_api::io_context& ctx, endpoint const& ep, callback_t const& on_disconnect) {
-    unique_fd fd = unique_fd(sock_create(AF_INET, SOCK_STREAM, 0));
+    unique_fd fd(sock_create(AF_INET, SOCK_STREAM, 0));
     sock_connect(fd.fd(), ep);
     return socket(ctx, std::move(fd), on_disconnect);
 }

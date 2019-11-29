@@ -34,7 +34,7 @@ public:
     basic_socket(basic_socket&&) noexcept = default;
     basic_socket& operator=(basic_socket&&) noexcept = default;
 
-    int recv(void* buff, size_t maxlen);
+    int recv(void* buff, size_t max_len);
     int send(void const* buff, size_t maxlen);
 };
 

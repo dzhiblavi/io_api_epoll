@@ -5,13 +5,6 @@
 #include "io_api.h"
 
 namespace {
-//volatile bool* quit = nullptr;
-
-//void signal_handler(int signal) {
-//    assert(quit);
-//    *quit = true;
-//}
-//volatile io_api::event_notifier* evn = nullptr;
 volatile int evn = -1;
 
 void signal_handler(int) {
@@ -27,8 +20,7 @@ int api_epoll_create() {
 }
 
 int api_epoll_wait(int efd, epoll_event* data, size_t size, int timeout) {
-    int nfd = epoll_wait(efd, data, size, timeout);
-    return nfd;
+    return epoll_wait(efd, data, size, timeout);
 }
 
 void api_epoll_ctl(int efd, int op, int fd, epoll_event* event) {
@@ -80,7 +72,6 @@ void io_context::exec() {
     unique_fd event_uq(evn);
     std::array<epoll_event, IPV4_EPOLL_MAX> events{};
     for (;;) {
-//        std::cerr << "wait()" << std::endl;
         int nfd = api_epoll_wait(efd_.fd(), events.data(), events.size(), 1000);
         if (nfd < 0) {
             if (errno == EINTR) {
@@ -89,7 +80,6 @@ void io_context::exec() {
                 IPV4_EXC_DEB(std::to_string(nfd));
             }
         }
-//        std::cerr << "wait() ok" << std::endl;
 
         for (auto it = events.begin(); it != events.begin() + nfd; ++it) {
             if (it->data.fd == evn)
@@ -99,7 +89,6 @@ void io_context::exec() {
     }
 
 end:
-    std::cerr << "FINISH" << std::endl;
     evn = -1;
 }
 
@@ -115,9 +104,8 @@ io_context const* io_unit::context() const noexcept {
     return ctx_;
 }
 
-void io_unit::reconf_events(uint32_t events) {
-    if (!ctx_)
-        return;
+void io_unit::reconfigure_events(uint32_t events) {
+    if (!ctx_) return;
     events_ = events;
     epoll_event event{events_, this};
     ctx_->ep_modify_(fd_, &event);
@@ -143,8 +131,7 @@ io_unit& io_unit::operator=(io_api::io_unit&& rhs) noexcept {
 }
 
 io_unit::~io_unit() {
-    if (!ctx_)
-        return;
+    if (!ctx_) return;
     epoll_event event{events_, this};
     ctx_->ep_remove_(fd_, &event);
 }
@@ -163,7 +150,7 @@ void swap(io_unit& a, io_unit& b) noexcept {
     std::swap(a.events_, b.events_);
     std::swap(a.fd_, b.fd_);
     std::swap(a.callback_, b.callback_);
-    a.reconf_events(a.events_);
-    b.reconf_events(b.events_);
+    a.reconfigure_events(a.events_);
+    b.reconfigure_events(b.events_);
 }
 } // namespace io_api

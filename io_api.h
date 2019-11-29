@@ -66,7 +66,7 @@ public:
     [[nodiscard]] io_context* context() noexcept;
     [[nodiscard]] io_context const* context() const noexcept;
 
-    void reconf_events(uint32_t events);
+    void reconfigure_events(uint32_t events);
     void configure_callback(callback_t) noexcept;
     void callback(uint32_t events);
 
