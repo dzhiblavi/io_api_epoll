@@ -1,7 +1,3 @@
-//
-// dzhiblavi
-//
-
 #ifndef WEB_CRACKER_IO_API_H
 #define WEB_CRACKER_IO_API_H
 
@@ -24,11 +20,6 @@ class io_context {
 
 private:
     unique_fd efd_;
-
-private:
-    void ep_add_(int, epoll_event*);
-    void ep_remove_(int, epoll_event*);
-    void ep_modify_(int, epoll_event*);
 
 public:
     io_context();
@@ -54,14 +45,13 @@ private:
 
 public:
     io_unit(io_context* ctx, uint32_t events, int fd, callback_t callback);
+    ~io_unit();
 
     io_unit(io_unit const&) = delete;
     io_unit& operator=(io_unit const&) = delete;
 
     io_unit(io_unit&&) noexcept;
     io_unit& operator=(io_unit&&) noexcept;
-
-    ~io_unit();
 
     [[nodiscard]] io_context* context() noexcept;
     [[nodiscard]] io_context const* context() const noexcept;

@@ -1,7 +1,3 @@
-//
-// dzhiblavi
-//
-
 #ifndef WEB_CRACKER_SOCKET_H
 #define WEB_CRACKER_SOCKET_H
 
@@ -26,7 +22,7 @@ protected:
     explicit basic_socket(unique_fd&&);
 
 public:
-    explicit basic_socket(endpoint const& ep);
+    explicit basic_socket(endpoint const& ep, bool non_block = false);
 
     basic_socket(basic_socket const&) = delete;
     basic_socket& operator=(basic_socket const&) = delete;
@@ -35,7 +31,7 @@ public:
     basic_socket& operator=(basic_socket&&) noexcept = default;
 
     int recv(void* buff, size_t max_len);
-    int send(void const* buff, size_t maxlen);
+    int send(void const* buff, size_t max_len);
 };
 
 class socket : private basic_socket {
@@ -60,6 +56,7 @@ private:
                                                   , callback_t on_read
                                                   , callback_t on_write);
 public:
+    socket(io_api::io_context& ctx, endpoint const& ep, callback_t on_disconnect);
     ~socket();
 
     socket(socket const&) = delete;
@@ -74,7 +71,6 @@ public:
     using basic_socket::recv;
     using basic_socket::send;
 
-    static socket connect(io_api::io_context& ctx, endpoint const& ep, callback_t const& on_disconnect);
     friend void swap(socket&, socket&) noexcept;
 };
 

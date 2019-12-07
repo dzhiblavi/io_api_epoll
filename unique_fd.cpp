@@ -1,7 +1,3 @@
-//
-// dzhiblavi
-//
-
 #include "unique_fd.h"
 
 unique_fd::unique_fd(int fd) noexcept

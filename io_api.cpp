@@ -1,7 +1,3 @@
-//
-// dzhiblavi
-//
-
 #include "io_api.h"
 
 namespace {
@@ -15,7 +11,7 @@ void signal_handler(int) {
 int api_epoll_create() {
     int efd = epoll_create(IPV4_EPOLL_MAX);
     if (efd < 0)
-        IPV4_EXCEPTION(std::to_string(errno));
+        IPV4_EXC(std::to_string(errno));
     return efd;
 }
 
@@ -26,23 +22,21 @@ int api_epoll_wait(int efd, epoll_event* data, size_t size, int timeout) {
 void api_epoll_ctl(int efd, int op, int fd, epoll_event* event) {
     int r = epoll_ctl(efd, op, fd, event);
     if (r < 0)
-        IPV4_EXCEPTION(std::to_string(errno));
+        IPV4_EXC(std::to_string(errno));
+}
+
+void create_notifier(int efd) {
+    epoll_event notifier{};
+    evn = eventfd(0, 0);
+    if (evn < 0)
+        IPV4_EXC(std::to_string(errno));
+    notifier.events = EPOLLIN;
+    notifier.data.fd = evn;
+    api_epoll_ctl(efd, EPOLL_CTL_ADD, evn, &notifier);
 }
 }
 
 namespace io_api {
-void io_context::ep_add_(int fd, epoll_event* event) {
-    api_epoll_ctl(efd_.fd(), EPOLL_CTL_ADD, fd, event);
-}
-
-void io_context::ep_remove_(int fd, epoll_event* event) {
-    api_epoll_ctl(efd_.fd(), EPOLL_CTL_DEL, fd, event);
-}
-
-void io_context::ep_modify_(int fd, epoll_event* event) {
-    api_epoll_ctl(efd_.fd(), EPOLL_CTL_MOD, fd, event);
-}
-
 io_context::io_context() {
     efd_ = unique_fd(api_epoll_create());
 }
@@ -59,17 +53,10 @@ io_context& io_context::operator=(io_context&& rhs) noexcept {
 void io_context::exec() {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
-    std::signal(SIGPIPE, SIG_IGN);
 
-    epoll_event notifier{};
-    evn = eventfd(0, 0);
-    if (evn < 0)
-        IPV4_EXC_DEB(std::to_string(errno));
-    notifier.events = EPOLLIN;
-    notifier.data.fd = evn;
-    ep_add_(evn, &notifier);
-
+    create_notifier(efd_.fd());
     unique_fd event_uq(evn);
+
     std::array<epoll_event, IPV4_EPOLL_MAX> events{};
     for (;;) {
         int nfd = api_epoll_wait(efd_.fd(), events.data(), events.size(), 1000);
@@ -77,7 +64,7 @@ void io_context::exec() {
             if (errno == EINTR) {
                 goto end;
             } else {
-                IPV4_EXC_DEB(std::to_string(nfd));
+                IPV4_EXC(std::to_string(nfd));
             }
         }
 
@@ -108,7 +95,7 @@ void io_unit::reconfigure_events(uint32_t events) {
     if (!ctx_) return;
     events_ = events;
     epoll_event event{events_, this};
-    ctx_->ep_modify_(fd_, &event);
+    api_epoll_ctl(ctx_->efd_.fd(), EPOLL_CTL_MOD, fd_, &event);
 }
 
 io_unit::io_unit(io_api::io_context *ctx, uint32_t events, int fd, io_api::io_unit::callback_t callback)
@@ -118,7 +105,7 @@ io_unit::io_unit(io_api::io_context *ctx, uint32_t events, int fd, io_api::io_un
     , callback_(std::move(callback))
 {
     epoll_event event{events_, this};
-    ctx_->ep_add_(fd_, &event);
+    api_epoll_ctl(ctx_->efd_.fd(), EPOLL_CTL_ADD, fd_, &event);
 }
 
 io_unit::io_unit(io_api::io_unit&& rhs) noexcept {
@@ -133,7 +120,7 @@ io_unit& io_unit::operator=(io_api::io_unit&& rhs) noexcept {
 io_unit::~io_unit() {
     if (!ctx_) return;
     epoll_event event{events_, this};
-    ctx_->ep_remove_(fd_, &event);
+    api_epoll_ctl(ctx_->efd_.fd(), EPOLL_CTL_DEL, fd_, &event);
 }
 
 void io_unit::callback(uint32_t events) {
@@ -145,7 +132,9 @@ void io_unit::configure_callback(io_api::io_unit::callback_t fn) noexcept {
     callback_.swap(fn);
 }
 
+// TODO: FIX BUG
 void swap(io_unit& a, io_unit& b) noexcept {
+    assert(false);
     std::swap(a.ctx_, b.ctx_);
     std::swap(a.events_, b.events_);
     std::swap(a.fd_, b.fd_);

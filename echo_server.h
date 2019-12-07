@@ -1,7 +1,3 @@
-//
-// dzhiblavi
-//
-
 #ifndef WEB_CRACKER_ECHO_SERVER_H
 #define WEB_CRACKER_ECHO_SERVER_H
 

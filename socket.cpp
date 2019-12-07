@@ -1,14 +1,10 @@
-//
-// dzhiblavi
-//
-
 #include "socket.h"
 
 namespace {
 int sock_create(int domain, int type, int proto) {
-    int s = socket(domain, type | SOCK_NONBLOCK, proto);
+    int s = socket(domain, type, proto);
     if (s < 0)
-        IPV4_EXCEPTION(std::to_string(errno));
+        IPV4_EXC(std::to_string(errno));
     return s;
 }
 
@@ -29,7 +25,7 @@ void sock_connect(int fd, ipv4::endpoint const& ep) {
 
     int r = connect(fd, reinterpret_cast<sockaddr const*>(&ad), sizeof ad);
     if (r < 0)
-        IPV4_EXCEPTION(std::to_string(errno));
+        IPV4_EXC(std::to_string(errno));
 }
 
 void sock_bind(int fd, ipv4::endpoint const& ep) {
@@ -41,18 +37,18 @@ void sock_bind(int fd, ipv4::endpoint const& ep) {
 
     int er = bind(fd, reinterpret_cast<sockaddr const*>(&ad), sizeof ad);
     if (er < 0)
-        IPV4_EXCEPTION(std::to_string(errno));
+        IPV4_EXC(std::to_string(errno));
 }
 
 void sock_listen(int fd, int maxq) {
     if (listen(fd, maxq) < 0)
-        IPV4_EXCEPTION(std::to_string(errno));
+        IPV4_EXC(std::to_string(errno));
 }
 
 int sock_accept(int fd) {
     int s = accept4(fd, nullptr, nullptr, SOCK_NONBLOCK);
     if (s < 0)
-        IPV4_EXCEPTION(std::to_string(errno));
+        IPV4_EXC(std::to_string(errno));
     return s;
 }
 }
@@ -62,16 +58,16 @@ int basic_socket::recv(void* buff, size_t max_len) {
     return sock_recv(fd_.fd(), buff, max_len);
 }
 
-int basic_socket::send(void const* buff, size_t len) {
-    return sock_send(fd_.fd(), buff, len);
+int basic_socket::send(void const* buff, size_t max_len) {
+    return sock_send(fd_.fd(), buff, max_len);
 }
 
 basic_socket::basic_socket(unique_fd&& fd)
     : fd_(std::move(fd))
 {}
 
-basic_socket::basic_socket(endpoint const& ep)
-    : fd_(sock_create(AF_INET, SOCK_STREAM, 0))
+basic_socket::basic_socket(endpoint const& ep, bool non_block)
+    : fd_(sock_create(AF_INET, SOCK_STREAM | (non_block ? SOCK_NONBLOCK : 0u), 0))
 {
     sock_connect(fd_.fd(), ep);
 }
@@ -84,28 +80,24 @@ uint32_t socket::events_() const noexcept {
 
 std::function<void(uint32_t)> socket::configure_callback_() noexcept {
     return [this](uint32_t flags) {
-        bool dstr = false;
-        bool* old_destr = destroyed_;
-        destroyed_ = &dstr;
-        try {
-            if ((flags & EPOLLERR)
-                || (flags & EPOLLRDHUP)
-                || (flags & EPOLLHUP)) {
-                this->on_disconnect_();
-                if (dstr)
-                    return;
-            }
-            if (flags & EPOLLIN) {
-                this->on_read_();
-                if (dstr)
-                    return;
-            }
-            if (flags & EPOLLOUT)
-                this->on_write_();
-        } catch (...) {
-            destroyed_ = old_destr;
+        bool cur_destroyed = false;
+        bool* old_destroyed = destroyed_;
+        destroyed_ = &cur_destroyed;
+        if ((flags & EPOLLERR)
+            || (flags & EPOLLRDHUP)
+            || (flags & EPOLLHUP)) {
+            this->on_disconnect_();
+            if (cur_destroyed)
+                return;
         }
-        destroyed_ = old_destr;
+        if (flags & EPOLLIN) {
+            this->on_read_();
+            if (cur_destroyed)
+                return;
+        }
+        if (flags & EPOLLOUT)
+            this->on_write_();
+        destroyed_ = old_destroyed;
     };
 }
 
@@ -126,6 +118,15 @@ socket::socket(io_api::io_context& ctx, unique_fd&& fd, callback_t on_disconnect
     , unit_(&ctx, events_(), fd_.fd(), configure_callback_())
     , destroyed_(nullptr)
 {}
+
+socket::socket(io_api::io_context& ctx, endpoint const& ep, callback_t on_disconnect)
+    : basic_socket(unique_fd(sock_create(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)))
+    , on_disconnect_(std::move(on_disconnect))
+    , unit_(&ctx, events_(), fd_.fd(), configure_callback_())
+    , destroyed_(nullptr)
+{
+    sock_connect(fd_.fd(), ep);
+}
 
 socket::~socket() {
     if (destroyed_ != nullptr)
@@ -160,12 +161,6 @@ void socket::set_on_write(callback_t on_write) {
     unit_.reconfigure_events(events_());
 }
 
-socket socket::connect(io_api::io_context& ctx, endpoint const& ep, callback_t const& on_disconnect) {
-    unique_fd fd(sock_create(AF_INET, SOCK_STREAM, 0));
-    sock_connect(fd.fd(), ep);
-    return socket(ctx, std::move(fd), on_disconnect);
-}
-
 void swap(socket& a, socket& b) noexcept {
     swap(a.fd_, b.fd_);
     std::swap(a.on_disconnect_, b.on_disconnect_);
@@ -178,7 +173,7 @@ void swap(socket& a, socket& b) noexcept {
 }
 
 server_socket::server_socket(io_api::io_context& ctx, endpoint const& addr, callback_t on_connected)
-    : fd_(sock_create(AF_INET, SOCK_STREAM, 0))
+    : fd_(sock_create(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0))
     , on_connected_(std::move(on_connected))
     , unit_(&ctx, EPOLLIN, fd_.fd(), [this](uint32_t flags) {
         if (flags == EPOLLIN)
@@ -200,4 +195,4 @@ socket server_socket::accept(callback_t const& on_disconnect
     int fd = sock_accept(fd_.fd());
     return socket(*unit_.context(), unique_fd(fd), on_disconnect, on_read, on_write);
 }
-} // nanmespace ipv4
+} // namespace ipv4

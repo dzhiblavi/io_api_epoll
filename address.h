@@ -1,7 +1,3 @@
-//
-// dzhiblavi
-//
-
 #ifndef WEB_CRACKER_ADDRESS_H
 #define WEB_CRACKER_ADDRESS_H
 

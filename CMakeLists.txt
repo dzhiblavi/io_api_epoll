@@ -8,7 +8,6 @@ set(REQ_FILES
         address.cpp
         unique_fd.cpp
         unique_fd.h
-        ipv4_exception.cpp
         ipv4_exception.h
         io_api.cpp
         io_api.h
@@ -19,6 +18,3 @@ set(REQ_FILES
 
 add_executable(server main.cpp
         ${REQ_FILES})
-
-add_executable(client client.cpp
-        ${REQ_FILES} http_request.cpp http_request.h)
