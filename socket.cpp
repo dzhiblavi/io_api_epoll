@@ -101,11 +101,8 @@ std::function<void(uint32_t)> socket::configure_callback_() noexcept {
     };
 }
 
-socket::socket(io_api::io_context& ctx, unique_fd&& fd, callback_t on_disconnect)
-    : basic_socket(std::move(fd))
-    , on_disconnect_(std::move(on_disconnect))
-    , unit_(&ctx, events_(), fd_.fd(), configure_callback_())
-    , destroyed_(nullptr)
+socket::socket(io_api::io_context& ctx, unique_fd&& fd, callback_t const& on_disconnect)
+    : socket(ctx, std::move(fd), on_disconnect, callback_t{}, callback_t{})
 {}
 
 socket::socket(io_api::io_context& ctx, unique_fd&& fd, callback_t on_disconnect
@@ -119,11 +116,15 @@ socket::socket(io_api::io_context& ctx, unique_fd&& fd, callback_t on_disconnect
     , destroyed_(nullptr)
 {}
 
-socket::socket(io_api::io_context& ctx, endpoint const& ep, callback_t on_disconnect)
-    : basic_socket(unique_fd(sock_create(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)))
-    , on_disconnect_(std::move(on_disconnect))
-    , unit_(&ctx, events_(), fd_.fd(), configure_callback_())
-    , destroyed_(nullptr)
+socket::socket(io_api::io_context& ctx, endpoint const& ep, callback_t const& on_disconnect)
+    : socket(ctx, ep, on_disconnect, callback_t{}, callback_t{})
+{}
+
+socket::socket(io_api::io_context& ctx, endpoint const& ep, callback_t const& on_disconnect
+                                                          , callback_t const& on_read
+                                                          , callback_t const& on_write)
+        : socket(ctx, unique_fd(sock_create(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)),
+                on_disconnect, on_read, on_write)
 {
     sock_connect(fd_.fd(), ep);
 }
