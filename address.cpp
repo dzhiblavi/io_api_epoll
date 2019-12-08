@@ -1,8 +1,5 @@
 #include "address.h"
 
-#include <sstream>
-#include <cstring>
-
 namespace {
 uint32_t try_resolve(std::string const& host) {
     hostent* hst = gethostbyname(host.c_str());
@@ -23,12 +20,36 @@ address::address(std::string const& host)
     : addr_(try_resolve(host))
 {}
 
+address address::any() noexcept {
+    return address(INADDR_ANY);
+}
+
 uint32_t address::net_addr() const noexcept {
     return addr_;
 }
+
+std::string address::to_string() const {
+    return inet_ntoa(in_addr{net_addr()});
+}
+
 address address::resolve(std::string const& host) {
     return address(host);
 }
+
+std::list<address> address::getaddrinfo(std::string const& hostname) {
+    addrinfo hints{}, *result = nullptr;
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    std::list<address> ret;
+    int r = ::getaddrinfo(hostname.c_str(), nullptr, &hints, &result);
+    if (r)
+        throw std::runtime_error("address::getaddrinfo failed: " + std::string(gai_strerror(r)));
+    for (addrinfo* nd = result; nd != nullptr; nd = nd->ai_next)
+        ret.emplace_back(reinterpret_cast<sockaddr_in *>(nd->ai_addr)->sin_addr.s_addr);
+    freeaddrinfo(result);
+    return ret;
+}
+
 
 endpoint::endpoint(uint32_t addr, uint16_t port) noexcept
     : addr_(addr)
@@ -53,7 +74,17 @@ uint16_t endpoint::port() const noexcept {
     return port_;
 }
 
-address address::any() noexcept {
-    return address(INADDR_ANY);
+std::string endpoint::to_string() const {
+    return std::string(inet_ntoa(in_addr{net_addr()})) + ":" + std::to_string(port());
+}
+
+std::ostream& operator<<(std::ostream& os, address const& addr) {
+    os << addr.to_string();
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, endpoint const& ep) {
+    os << ep.to_string();
+    return os;
 }
 } // namespace ipv4

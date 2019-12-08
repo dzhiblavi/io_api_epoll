@@ -5,7 +5,10 @@
 #include <string>
 #include <sys/types.h>
 #include <netdb.h>
+#include <list>
+#include <cstring>
 #include <iostream>
+#include <arpa/inet.h>
 
 #include "ipv4_exception.h"
 #include "unique_fd.h"
@@ -21,8 +24,11 @@ public:
     explicit address(std::string const&);
 
     [[nodiscard]] uint32_t net_addr() const noexcept;
-    [[nodiscard]] static address resolve(std::string const& host);
+    [[nodiscard]] std::string to_string() const;
+
     [[nodiscard]] static address any() noexcept;
+    [[nodiscard]] static address resolve(std::string const& host);
+    [[nodiscard]] static std::list<address> getaddrinfo(std::string const& hostname);
 };
 
 struct endpoint {
@@ -38,7 +44,11 @@ public:
 
     [[nodiscard]] uint32_t net_addr() const noexcept;
     [[nodiscard]] uint16_t port() const noexcept;
+    [[nodiscard]] std::string to_string() const;
 };
+
+std::ostream& operator<<(std::ostream& os, address const& addr);
+std::ostream& operator<<(std::ostream& os, endpoint const& ep);
 } // namespace ipv4
 
 #endif //WEB_CRACKER_ADDRESS_H
