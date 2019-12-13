@@ -136,10 +136,12 @@ socket::~socket() {
 
 socket::socket(ipv4::socket&& b) noexcept
     : basic_socket(std::move(b.fd_))
-    , unit_(std::move(b.unit_))
     , on_disconnect_(std::move(b.on_disconnect_))
     , on_read_(std::move(b.on_read_))
     , on_write_(std::move(b.on_write_))
+    , unit_(std::move(b.unit_))
+    , destroyed_(nullptr)
+
 {
     std::swap(destroyed_, b.destroyed_);
     unit_.configure_callback(configure_callback_());
@@ -162,6 +164,14 @@ void socket::set_on_write(callback_t on_write) {
     unit_.reconfigure_events(events_());
 }
 
+bool socket::has_on_read() const noexcept {
+    return bool(on_read_);
+}
+
+bool socket::has_on_write() const noexcept {
+    return bool(on_write_);
+}
+
 void swap(socket& a, socket& b) noexcept {
     swap(a.fd_, b.fd_);
     std::swap(a.on_disconnect_, b.on_disconnect_);
@@ -181,6 +191,10 @@ server_socket::server_socket(io_api::io_context& ctx, endpoint const& addr, call
             on_connected_();
     })
 {
+    int enable = 1;
+    int err = setsockopt(fd_.fd(), SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
+    if (err < 0)
+        IPV4_EXC(std::to_string(errno));
     sock_bind(fd_.fd(), addr);
     sock_listen(fd_.fd(), SSOCK_MAX_LISTEN);
 }

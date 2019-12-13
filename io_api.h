@@ -1,7 +1,7 @@
 #ifndef WEB_CRACKER_IO_API_H
 #define WEB_CRACKER_IO_API_H
 
-#define IPV4_EPOLL_MAX 2000
+#define IPV4_EPOLL_MAX 100000
 
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
@@ -13,6 +13,7 @@
 
 #include "ipv4_exception.h"
 #include "unique_fd.h"
+#include "timer.h"
 
 namespace io_api {
 class io_context {
@@ -20,6 +21,10 @@ class io_context {
 
 private:
     unique_fd efd_;
+    timer tm;
+
+private:
+    int call_and_timeout();
 
 public:
     io_context();
@@ -30,6 +35,7 @@ public:
     io_context& operator=(io_context&&) noexcept;
 
     void exec();
+    timer& get_timer();
     friend void swap(io_context&, io_context&) noexcept;
 };
 

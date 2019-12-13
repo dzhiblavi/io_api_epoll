@@ -53,13 +53,13 @@ private:
 
     socket(io_api::io_context& ctx, unique_fd&& fd, callback_t const& on_disconnect);
     socket(io_api::io_context& ctx, unique_fd&& fd, callback_t on_disconnect
-                                                  , callback_t on_read
-                                                  , callback_t on_write);
+            , callback_t on_read
+            , callback_t on_write);
 public:
     socket(io_api::io_context& ctx, endpoint const& ep, callback_t const& on_disconnect);
     socket(io_api::io_context& ctx, endpoint const& ep, callback_t const& on_disconnect
-                                                      , callback_t const& on_read
-                                                      , callback_t const& on_write);
+            , callback_t const& on_read
+            , callback_t const& on_write);
     ~socket();
 
     socket(socket const&) = delete;
@@ -70,6 +70,9 @@ public:
 
     void set_on_read(callback_t on_read);
     void set_on_write(callback_t on_write);
+
+    [[nodiscard]] bool has_on_read() const noexcept;
+    [[nodiscard]] bool has_on_write() const noexcept;
 
     using basic_socket::recv;
     using basic_socket::send;
@@ -91,8 +94,8 @@ public:
 
     socket accept(callback_t const& on_disconnect);
     socket accept(callback_t const& on_disconnect
-                , callback_t const& on_read
-                , callback_t const& on_write);
+            , callback_t const& on_read
+            , callback_t const& on_write);
 };
 } // namespace ipv4
 

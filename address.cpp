@@ -43,7 +43,7 @@ std::list<address> address::getaddrinfo(std::string const& hostname) {
     std::list<address> ret;
     int r = ::getaddrinfo(hostname.c_str(), nullptr, &hints, &result);
     if (r)
-        throw std::runtime_error("address::getaddrinfo failed: " + std::string(gai_strerror(r)));
+        throw ipv4::exception("address::getaddrinfo failed: " + std::string(gai_strerror(r)));
     for (addrinfo* nd = result; nd != nullptr; nd = nd->ai_next)
         ret.emplace_back(reinterpret_cast<sockaddr_in *>(nd->ai_addr)->sin_addr.s_addr);
     freeaddrinfo(result);
