@@ -19,7 +19,9 @@ set(REQ_FILES
         getaddrinfo_server.cpp
         getaddrinfo_server.h
         timer.cpp
-        timer.h)
+        timer.h
+        p_thread.cpp
+        p_thread.h)
 
 add_executable(server main.cpp
         ${REQ_FILES})

@@ -35,7 +35,7 @@ struct getaddrinfo_server::client_connection_ {
         ~worker_thread_();
 
         void add_task(std::string const&);
-        bool fail() const noexcept;
+        [[nodiscard]] bool fail() const noexcept;
 
     public:
         std::queue<std::string> tasks;

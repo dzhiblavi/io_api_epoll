@@ -50,6 +50,9 @@ getaddrinfo_server::client_connection_::worker_thread_::worker_thread_(client_co
                 res = fail_message(hostname, "unknown reason");
             }
 
+            if (quit)
+                break;
+
             try {
                 {
                     std::unique_lock<std::mutex> lg_res(rm);
@@ -58,7 +61,7 @@ getaddrinfo_server::client_connection_::worker_thread_::worker_thread_(client_co
 
                 if (!this->conn->sock.has_on_write()) {
                     this->conn->sock.set_on_write([this] {
-                        std::cerr << "\033[37;1;41mon_write():\033[0m" << results.size() << std::endl;
+                        std::cerr << "\033[31mon_write():\033[0m" << results.size() << std::endl;
 
                         if (results.empty()) {
                             std::unique_lock<std::mutex> lg(rm);
@@ -92,6 +95,7 @@ getaddrinfo_server::client_connection_::worker_thread_::~worker_thread_() {
     {
         std::unique_lock<std::mutex> lg(tm);
         quit = true;
+        kill(th.native_handle(), SIGINT);
     }
     cv.notify_one();
     th.join();
