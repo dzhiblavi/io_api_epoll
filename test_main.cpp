@@ -20,22 +20,22 @@ TEST(basic, simple2) {
         io_api::io_unit unit(&ctx, 0, 0, [](uint32_t) {});
 }
 
-//TEST(basic, simple3) {
-//    std::ifstream fin("/home/dzhiblavi/Documents/prog/cpp/code/io_api_epoll/build/hosts2.txt");
-//    if (fin.fail())
-//        std::cerr << "failed to open file [simple3]" << std::endl;
-//    std::string host;
-//    while (fin >> host) {
-//        try {
-//            auto list = ipv4::address::getaddrinfo(host);
-//            std::cout << host << ": {";
-//            for (auto it = list.begin(); it != list.end(); ++it)
-//                std::cout << *it << (std::next(it) == list.end() ? "}\n" : "\n");
-//        } catch (...) {
-//            std::cerr << "failed to resolve: " << host << std::endl;
-//        }
-//    }
-//}
+TEST(basic, getaddrinfo_api) {
+    std::ifstream fin("/home/dzhiblavi/Documents/prog/cpp/code/io_api_epoll/build/hosts2.txt");
+    if (fin.fail())
+        std::cerr << "failed to open file [simple3]" << std::endl;
+    std::string host;
+    while (fin >> host) {
+        try {
+            auto list = ipv4::address::getaddrinfo(host);
+            std::cout << host << ": {";
+            for (auto it = list.begin(); it != list.end(); ++it)
+                std::cout << *it << (std::next(it) == list.end() ? "}\n" : "\n");
+        } catch (...) {
+            std::cerr << "failed to resolve: " << host << std::endl;
+        }
+    }
+}
 
 TEST(getaddrinfo, single_spam) {
     std::ifstream fin("/home/dzhiblavi/Documents/prog/cpp/code/io_api_epoll/build/hosts2.txt");

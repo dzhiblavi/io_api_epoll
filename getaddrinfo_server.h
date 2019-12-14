@@ -35,6 +35,7 @@ struct getaddrinfo_server::client_connection_ {
         ~worker_thread_();
 
         void add_task(std::string const&);
+        bool fail() const noexcept;
 
     public:
         std::queue<std::string> tasks;
@@ -42,6 +43,7 @@ struct getaddrinfo_server::client_connection_ {
 
         client_connection_* conn;
         bool quit;
+        bool failbit;
         std::condition_variable cv;
         std::mutex tm;
         std::mutex rm;
