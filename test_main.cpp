@@ -25,6 +25,7 @@ TEST(basic, getaddrinfo_api) {
     if (fin.fail())
         std::cerr << "failed to open file [simple3]" << std::endl;
     std::string host;
+    int k = 0, maxk = 100;
     while (fin >> host) {
         try {
             auto list = ipv4::address::getaddrinfo(host);
@@ -34,6 +35,8 @@ TEST(basic, getaddrinfo_api) {
         } catch (...) {
             std::cerr << "failed to resolve: " << host << std::endl;
         }
+        if (++k == maxk)
+            break;
     }
 }
 
@@ -79,7 +82,44 @@ TEST(getaddrinfo, multiple_spam) {
         vec.emplace_back(ipv4::endpoint(ipv4::address::any(), 3333));
         vec.back().send(hhost.c_str(), hhost.size());
     }
-    char buff[1024];
+    char buff[65536];
+    for (auto& sock : vec) {
+        int cur = 0;
+        for (;;) {
+            int r = sock.recv(buff + cur, 65536 - cur);
+            if (r == 0)
+                break;
+            cur += r;
+        }
+        for (int i = 0, st = 0; i < cur - 1; ++i) {
+            if (buff[i] == '\r' && buff[i + 1] == '\n') {
+                std::string returned(buff + st, buff + i);
+                st = i + 2;
+                std::cout << "resolved: " << returned << std::endl;
+            }
+        }
+    }
+}
+
+TEST(getaddrinfo, uniform_spam) {
+    std::ifstream fin("/home/dzhiblavi/Documents/prog/cpp/code/io_api_epoll/build/hosts2.txt");
+    if (fin.fail())
+        std::cerr << "failed to open file [simple3]" << std::endl;
+
+    std::vector<ipv4::basic_socket> vec;
+
+    std::string host;
+    int k = 0, max_sock = 50;
+    while (fin >> host) {
+        auto hhost = host + "\r\n";
+        if (k == max_sock || vec.empty()) {
+            k = 0;
+            vec.emplace_back(ipv4::endpoint(ipv4::address::any(), 3333));
+        }
+        ++k;
+        vec.back().send(hhost.c_str(), hhost.size());
+    }
+    char buff[65536];
     for (auto& sock : vec) {
         int cur = 0;
         for (;;) {
