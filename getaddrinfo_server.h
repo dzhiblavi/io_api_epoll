@@ -54,15 +54,15 @@ struct getaddrinfo_server::client_connection_ {
         std::thread th;
     };
 
+public:
     void process_read(timer& tm);
     void process_write();
     bool is_idle();
-
     explicit client_connection_(io_api::io_context& ctx, getaddrinfo_server*);
 
+public:
     char buff[GETADDRINFO_BUFSIZE]{};
     int offset;
-
     socket sock;
     worker_thread_ w;
     timer_unit timr;

@@ -125,7 +125,6 @@ bool getaddrinfo_server::client_connection_::worker_thread_::fail() const noexce
     return failbit;
 }
 
-
 void getaddrinfo_server::client_connection_::process_read(timer& tm) {
 //    errlog("on_read()");
     int r = sock.recv(buff + offset, GETADDRINFO_BUFSIZE - offset);
