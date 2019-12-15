@@ -1,22 +1,51 @@
 #include "getaddrinfo_server.h"
 
 namespace {
+std::mutex error_log_mutex;
+
+#ifdef DEBUG
+void errlog(std::string const& what) {
+    std::unique_lock<std::mutex> lg(error_log_mutex);
+    std::cerr << what << std::endl;
+}
+#else
+#define errlog
+#endif
+
 std::string fail_message(std::string const& hostname, std::string const& why) {
     std::stringstream resstr;
-    resstr << "[failed to resolve : "
-           << why << "]: '" << hostname << "'\n";
+//    resstr << "[failed to resolve : "
+//           << why << "]: '" << hostname << "'";
+    resstr << "[failed to resolve '" << hostname << "']";
     return resstr.str();
 }
 
-std::string form_response(std::list<ipv4::address> const& hs) {
+std::string form_response(std::string const& host) {
+    auto hs = ipv4::address::getaddrinfo(host);
+
+//    std::vector<std::string> vec;
+//    for (auto const& ad : hs)
+//        vec.push_back(ad.to_string());
+//    sort(vec.begin(), vec.end());
+//
+//    std::stringstream resstr;
+//    resstr << host << "::{";
+//    for (auto it = vec.begin(); it != vec.end(); ++it) {
+//        resstr << *it;
+//        if (std::next(it) != vec.end())
+//            resstr << ", ";
+//        else
+//            resstr << "}";
+//    }
+
     std::stringstream resstr;
-    resstr << "{";
+    resstr << host << "::{";
     for (auto it = hs.begin(); it != hs.end(); ++it) {
         resstr << it->to_string();
         if (std::next(it) != hs.end())
             resstr << ", ";
         else
-            resstr << "}\n";
+            resstr << "}";
     }
     return resstr.str();
 }
@@ -24,71 +53,54 @@ std::string form_response(std::list<ipv4::address> const& hs) {
 
 namespace ipv4 {
 getaddrinfo_server::client_connection_::worker_thread_::worker_thread_(client_connection_* conn)
-    : conn(conn)
-    , quit(false)
-    , failbit(false)
-    , th(
-    [this] {
-        for (;;) {
-            std::unique_lock<std::mutex> lg(tm);
-            cv.wait(lg, [this] {
-                return quit || !tasks.empty();
-            });
-            if (quit)
-                break;
+        : conn(conn)
+        , is_working(false)
+        , quit(false)
+        , failbit(false)
+        , th(
+        [this] {
+            for (;;) {
+                is_working = false;
+                std::unique_lock<std::mutex> lg(tm);
+                cv.wait(lg, [this] {
+                    return quit || !tasks.empty();
+                });
+                is_working = true;
+                if (quit)
+                    break;
 
-            auto hostname = std::move(tasks.front());
-            tasks.pop();
-            lg.unlock();
+                auto hostname = std::move(tasks.front());
+                tasks.pop();
+                lg.unlock();
 
-            std::string res;
-            try {
-                res = form_response(address::getaddrinfo(hostname));
-            } catch (ipv4::exception const &e) {
-                res = fail_message(hostname, e.what());
-            } catch (...) {
-                res = fail_message(hostname, "unknown reason");
-            }
+                std::string res;
+                try {
+                    res = form_response(hostname);
+                } catch (ipv4::exception const &e) {
+                    res = fail_message(hostname, e.what());
+                } catch (...) {
+                    res = fail_message(hostname, "unknown reason");
+                }
 
-            if (quit)
-                break;
+                if (quit)
+                    break;
 
-            try {
-                {
+                try {
                     std::unique_lock<std::mutex> lg_res(rm);
                     results += res + "\r\n";
+
+                    if (!this->conn->sock.has_on_write()) {
+                        this->conn->sock.set_on_write([this] {
+                            this->conn->process_write();
+                        });
+                    }
+                } catch (...) {
+                    // doing nothing about this; let client repeat his request
+                    errlog("ERROR");
+                    failbit = true;
                 }
-
-                if (!this->conn->sock.has_on_write()) {
-                    this->conn->sock.set_on_write([this] {
-                        std::cerr << "\033[31mon_write():\033[0m" << results.size() << std::endl;
-
-                        if (results.empty()) {
-                            std::unique_lock<std::mutex> lg(rm);
-                            this->conn->sock.set_on_write({});
-                            return;
-                        }
-
-                        int r = this->conn->sock.send(results.c_str(), results.size());
-                        if (r == (int) results.size()) {
-                            std::unique_lock<std::mutex> lg(rm);
-                            results.clear();
-                            this->conn->sock.set_on_write({});
-                        } else if ((r >= 0 && r < (int) results.size()) || (r < 0 && errno == EINTR)) {
-                            r = std::max(r, 0);
-                            std::unique_lock<std::mutex> lg(rm);
-                            results = results.substr(r);
-                        } else {
-                            IPV4_EXC(std::to_string(errno));
-                        }
-                    });
-                }
-            } catch (...) {
-                // doing nothing about this; let client repeat his request
-                failbit = true;
             }
-        }
-    })
+        })
 {}
 
 getaddrinfo_server::client_connection_::worker_thread_::~worker_thread_() {
@@ -114,46 +126,85 @@ bool getaddrinfo_server::client_connection_::worker_thread_::fail() const noexce
 }
 
 
-getaddrinfo_server::client_connection_::client_connection_(io_api::io_context& ctx, ipv4::getaddrinfo_server *server)
-    : sock(server->ssock.accept(
-    [this, server] {
-        std::cerr << "on_disconnect()" << std::endl;
-        server->cl.erase(this);
-    },
-    [this, &ctx] {
-        std::cerr << "on_read()" << std::endl;
-        char buff[1024] = {0};
-        int r = sock.recv(buff, 1024);
-        if (r < 0) {
-            if (errno == EINTR)
-                return;
-            IPV4_EXC(std::to_string(errno));
-        }
+void getaddrinfo_server::client_connection_::process_read(timer& tm) {
+//    errlog("on_read()");
+    int r = sock.recv(buff + offset, GETADDRINFO_BUFSIZE - offset);
+    if (r < 0) {
+        if (errno == EINTR)
+            return;
+        IPV4_EXC(std::to_string(errno));
+    }
 
-        int st = 0;
-        for (int i = 0; i < r - 1; ++i) {
-            if (buff[i] == '\r' && buff[i + 1] == '\n') {
-                std::string host(buff + st, buff + i);
-                std::cerr << "adding task: '" << host << "'" << std::endl;
-                w.add_task(std::string(buff + st, buff + i));
-                st = i + 2;
-            }
+    int st = 0;
+    for (int i = 0; i < offset + r - 1; ++i) {
+        if (buff[i] == '\r' && buff[i + 1] == '\n') {
+            std::string host(buff + st, buff + i);
+//            errlog("adding task: '" + host + "'");
+            w.add_task(host);
+            st = i + 2;
         }
-        timer.reset(ctx.get_timer(), timer::clock_t::now() + std::chrono::seconds(10));
-    }, {}))
-    , w(this)
-    , timer(&ctx.get_timer(), timer::clock_t::now() + std::chrono::seconds(10), [this, server]{
-        std::cerr << "timer called()" << std::endl;
-        server->cl.erase(this);
-    })
+    }
+    if (st != offset + r) {
+        errlog("\033[41mNOT FULL RECEIVE\033[0m:\t" + std::string(buff + st, buff + offset + r));
+        std::memmove(buff, buff + st, offset + r - st);
+        offset = offset + r - st;
+    } else {
+        offset = 0;
+    }
+    timr.reset(tm, timer::clock_t::now() + std::chrono::seconds(GETADDRINFO_TIMEOUT));
+}
+
+void getaddrinfo_server::client_connection_::process_write() {
+    std::unique_lock<std::mutex> lg(w.rm);
+
+//    errlog("\033[31mon_write():\033[0m" + std::to_string(w.results.size()));
+    if (w.results.empty()) {
+        sock.set_on_write({});
+        return;
+    }
+
+    int r = sock.send(w.results.c_str(), w.results.size());
+    if (r == (int)w.results.size()) {
+        w.results.clear();
+        sock.set_on_write({});
+    } else if ((r >= 0 && r < (int)w.results.size()) || (r < 0 && errno == EINTR)) {
+        r = std::max(r, 0);
+        w.results = w.results.substr(r);
+    } else {
+        IPV4_EXC(std::to_string(errno));
+    }
+}
+
+getaddrinfo_server::client_connection_::client_connection_(io_api::io_context& ctx, ipv4::getaddrinfo_server *server)
+        : offset(0)
+        , sock(server->ssock.accept(
+        [this, server] {
+//            errlog("on_disconnect()");
+            server->cl.erase(this);
+        },
+        [this, &ctx] {
+            process_read(ctx.get_timer());
+        }, {}))
+        , w(this)
+        , timr(&ctx.get_timer(), timer::clock_t::now()
+            + std::chrono::seconds(GETADDRINFO_TIMEOUT),
+        [this, server] {
+            errlog("\033[41mtimer_callback()\033[0m");
+            if (is_idle())
+                server->cl.erase(this);
+        })
 {}
 
+bool getaddrinfo_server::client_connection_::client_connection_::is_idle() {
+    return !w.is_working && !sock.has_on_write() && offset == 0;
+}
+
 getaddrinfo_server::getaddrinfo_server(io_api::io_context &ctx, const ipv4::endpoint &ep)
-    : ssock(ctx, ep
-            , [this, &ctx] {
-                std::cerr << "on_connect()" << std::endl;
-                auto cc = new client_connection_(ctx, this);
-                cl.emplace(cc, std::unique_ptr<client_connection_>(cc));
-            })
+        : ssock(ctx, ep
+        , [this, &ctx] {
+//            errlog("on_connect()");
+            auto cc = new client_connection_(ctx, this);
+            cl.emplace(cc, std::unique_ptr<client_connection_>(cc));
+        })
 {}
 }

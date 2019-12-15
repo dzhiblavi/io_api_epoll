@@ -5,7 +5,8 @@ unique_fd::unique_fd(int fd) noexcept
 {}
 
 unique_fd::~unique_fd() {
-    close(fd_);
+    if (fd_ != -1)
+        close(fd_);
 }
 
 unique_fd::unique_fd(unique_fd&& rhs) noexcept {

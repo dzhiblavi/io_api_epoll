@@ -14,6 +14,9 @@
 #include "socket.h"
 #include "timer.h"
 
+#define GETADDRINFO_BUFSIZE 1024
+#define GETADDRINFO_TIMEOUT 10
+
 namespace ipv4 {
 class getaddrinfo_server {
     struct client_connection_;
@@ -42,6 +45,7 @@ struct getaddrinfo_server::client_connection_ {
         result_t results;
 
         client_connection_* conn;
+        bool is_working;
         bool quit;
         bool failbit;
         std::condition_variable cv;
@@ -50,11 +54,18 @@ struct getaddrinfo_server::client_connection_ {
         std::thread th;
     };
 
+    void process_read(timer& tm);
+    void process_write();
+    bool is_idle();
+
     explicit client_connection_(io_api::io_context& ctx, getaddrinfo_server*);
+
+    char buff[GETADDRINFO_BUFSIZE]{};
+    int offset;
 
     socket sock;
     worker_thread_ w;
-    timer_unit timer;
+    timer_unit timr;
 };
 }
 

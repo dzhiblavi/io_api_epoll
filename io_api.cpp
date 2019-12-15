@@ -1,11 +1,17 @@
 #include "io_api.h"
 
 namespace {
+volatile bool* quit = nullptr;
 volatile int evn = -1;
 
 void signal_handler(int) {
     if (evn == -1) return;
     ::eventfd_write(evn, 0);
+}
+
+void bsignal_handler(int) {
+    if (!quit) return;
+    *quit = true;
 }
 
 int api_epoll_create() {
@@ -51,15 +57,22 @@ io_context& io_context::operator=(io_context&& rhs) noexcept {
 }
 
 void io_context::exec() {
-    std::signal(SIGINT, signal_handler);
-    std::signal(SIGTERM, signal_handler);
+//    std::signal(SIGINT, signal_handler);
+//    std::signal(SIGTERM, signal_handler);
+    bool quitf = false;
+    quit = &quitf;
+    std::signal(SIGINT, bsignal_handler);
+    std::signal(SIGTERM, bsignal_handler);
 
-    create_notifier(efd_.fd());
-    unique_fd event_uq(evn);
+//    create_notifier(efd_.fd());
+//    unique_fd event_uq(evn);
 
     std::array<epoll_event, IPV4_EPOLL_MAX> events{};
     for (;;) {
+        if (quitf)goto end;
         int nfd = api_epoll_wait(efd_.fd(), events.data(), events.size(), call_and_timeout());
+        if (quitf) goto end;
+
         if (nfd < 0) {
             if (errno == EINTR) {
                 goto end;
@@ -69,8 +82,8 @@ void io_context::exec() {
         }
 
         for (auto it = events.begin(); it != events.begin() + nfd; ++it) {
-            if (it->data.fd == evn)
-                goto end;
+            if (quitf) goto end;
+//            if (it->data.fd == evn) goto end;
             static_cast<io_unit *>(it->data.ptr)->callback(it->events);
         }
     }
