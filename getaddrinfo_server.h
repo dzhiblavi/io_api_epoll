@@ -14,8 +14,11 @@
 #include "socket.h"
 #include "timer.h"
 
+#include "../dthread/dthread.h"
+
 #define GETADDRINFO_BUFSIZE 1024
 #define GETADDRINFO_TIMEOUT 10
+#define CONNECTION_THREAD_STACK_SIZE 512
 
 namespace ipv4 {
 class getaddrinfo_server {
@@ -52,6 +55,8 @@ struct getaddrinfo_server::client_connection_ {
         std::mutex tm;
         std::mutex rm;
         std::thread th;
+//        dthread th;
+//        void* stack;
     };
 
 public:

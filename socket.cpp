@@ -83,20 +83,24 @@ std::function<void(uint32_t)> socket::configure_callback_() noexcept {
         bool cur_destroyed = false;
         bool* old_destroyed = destroyed_;
         destroyed_ = &cur_destroyed;
-        if ((flags & EPOLLERR)
-            || (flags & EPOLLRDHUP)
-            || (flags & EPOLLHUP)) {
-            this->on_disconnect_();
-            if (cur_destroyed)
-                return;
+        try {
+            if ((flags & EPOLLERR)
+                || (flags & EPOLLRDHUP)
+                || (flags & EPOLLHUP)) {
+                this->on_disconnect_();
+                if (cur_destroyed)
+                    return;
+            }
+            if (flags & EPOLLIN) {
+                this->on_read_();
+                if (cur_destroyed)
+                    return;
+            }
+            if (flags & EPOLLOUT)
+                this->on_write_();
+        } catch (...) {
+            // ignore any errors in callbacks
         }
-        if (flags & EPOLLIN) {
-            this->on_read_();
-            if (cur_destroyed)
-                return;
-        }
-        if (flags & EPOLLOUT)
-            this->on_write_();
         destroyed_ = old_destroyed;
     };
 }

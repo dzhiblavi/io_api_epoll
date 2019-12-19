@@ -3,10 +3,11 @@ project(web_cracker)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -lpthread")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDEBUG")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -DDEBUG")
 
 
 set(REQ_FILES
+        ../dthread/dthread.h
         address.h
         address.cpp
         unique_fd.cpp
@@ -16,14 +17,11 @@ set(REQ_FILES
         io_api.h
         socket.cpp
         socket.h
-        echo_server.cpp
-        echo_server.h
         getaddrinfo_server.cpp
         getaddrinfo_server.h
         timer.cpp
         timer.h
-        p_thread.cpp
-        p_thread.h)
+        )
 
 add_executable(server main.cpp
         ${REQ_FILES})
