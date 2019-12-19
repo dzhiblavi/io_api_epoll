@@ -1,6 +1,0 @@
-cmake-build-debug/
-build/
-.idea/
-client.cpp
-http_request.cpp
-http_request.h
