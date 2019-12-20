@@ -24,11 +24,12 @@
 #define GACHI_CONNECTION_THREAD_STACK_SIZE 125
 #endif
 
-// 1 = only errors
-// 2 = 1 + connect/disconnect/timer
-// 3 = 2 + on_read/on_write
-// 4 = all
-#define GACHI_LOGLEVEL 1
+// bit / result
+// 1 = errors
+// 2 = connect/disconnect/timer
+// 4 = on_read/on_write
+// 8 = log requests
+#define GACHI_LOGLEVEL 15
 
 namespace ipv4 {
 class getaddrinfo_server {

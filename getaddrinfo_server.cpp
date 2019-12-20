@@ -71,62 +71,62 @@ getaddrinfo_server::client_connection_::worker_thread_::worker_thread_(client_co
         , failbit(false)
         , th(
 #ifdef GACHI_USE_DTHREAD
-                make_thread(GACHI_CONNECTION_THREAD_STACK_SIZE, &stack,
+        make_thread(GACHI_CONNECTION_THREAD_STACK_SIZE, &stack,
 #endif
-                            [this] {
-                                for (;;) {
-                                    is_working = false;
-                                    std::unique_lock<std::mutex> lg(tm);
-                                    cv.wait(lg, [this] {
-                                        return quit || !tasks.empty();
-                                    });
-                                    is_working = true;
-                                    if (quit)
-                                        break;
+        [this] {
+            for (;;) {
+                is_working = false;
+                std::unique_lock<std::mutex> lg(tm);
+                cv.wait(lg, [this] {
+                    return quit || !tasks.empty();
+                });
+                is_working = true;
+                if (quit)
+                    break;
 
-                                    auto hostname = std::move(tasks.front());
-                                    tasks.pop();
-                                    lg.unlock();
+                auto hostname = std::move(tasks.front());
+                tasks.pop();
+                lg.unlock();
 
-                                    std::string res;
-                                    try {
-                                        try {
-                                            res = form_response(hostname);
-                                        } catch (ipv4::exception const &e) {
-                                            res = fail_message(hostname, e.what());
-                                        } catch (...) {
-                                            res = fail_message(hostname, "unknown reason");
-                                        }
-                                    } catch (...) {
-#if GACHI_LOGLEVEL >= 1
-                                        errlog("ERROR");
-#endif
-                                        failbit = true;
-                                    }
+                std::string res;
+                try {
+                    try {
+                        res = form_response(hostname);
+                    } catch (ipv4::exception const &e) {
+                        res = fail_message(hostname, e.what());
+                    } catch (...) {
+                        res = fail_message(hostname, "unknown reason");
+                    }
+                } catch (...) {
+    #if GACHI_LOGLEVEL & 1
+                    errlog("ERROR");
+    #endif
+                    failbit = true;
+                }
 
-                                    if (quit)
-                                        break;
+                if (quit)
+                    break;
 
-                                    try {
-                                        std::unique_lock<std::mutex> lg_res(rm);
-                                        results += res + "\r\n";
+                try {
+                    std::unique_lock<std::mutex> lg_res(rm);
+                    results += res + "\r\n";
 
-                                        if (!this->conn->sock.has_on_write()) {
-                                            this->conn->sock.set_on_write([this] {
-                                                this->conn->process_write();
-                                            });
-                                        }
-                                    } catch (...) {
-                                        // doing nothing about this; let client repeat his request
-#if GACHI_LOGLEVEL >= 1
-                                        errlog("ERROR");
-#endif
-                                        failbit = true;
-                                    }
-                                }
-                            })
+                    if (!this->conn->sock.has_on_write()) {
+                        this->conn->sock.set_on_write([this] {
+                            this->conn->process_write();
+                        });
+                    }
+                } catch (...) {
+                    // doing nothing about this; let client repeat his request
+    #if GACHI_LOGLEVEL & 1
+                    errlog("ERROR");
+    #endif
+                    failbit = true;
+                }
+            }
+        })
 #ifdef GACHI_USE_DTHREAD
-        )
+    )
 #endif
 {}
 
@@ -156,7 +156,7 @@ bool getaddrinfo_server::client_connection_::worker_thread_::fail() const noexce
 }
 
 void getaddrinfo_server::client_connection_::process_read(timer& tm) {
-#if GACHI_LOGLEVEL >= 3
+#if GACHI_LOGLEVEL & 4
     errlog("on_read()");
 #endif
     int r = sock.recv(buff + offset, GACHI_BUFFSIZE - offset);
@@ -170,7 +170,7 @@ void getaddrinfo_server::client_connection_::process_read(timer& tm) {
     for (int i = 0; i < offset + r - 1; ++i) {
         if (buff[i] == '\r' && buff[i + 1] == '\n') {
             std::string host(buff + st, buff + i);
-#if GACHI_LOGLEVEL >= 4
+#if GACHI_LOGLEVEL & 8
             errlog("adding task: '" + host + "'");
 #endif
             w.add_task(host);
@@ -178,7 +178,7 @@ void getaddrinfo_server::client_connection_::process_read(timer& tm) {
         }
     }
     if (st != offset + r) {
-#if GACHI_LOGLEVEL >= 3
+#if GACHI_LOGLEVEL & 4
         errlog("\033[41mnot full receive\033[0m:\t", std::string(buff + st, buff + offset + r));
 #endif
         std::memmove(buff, buff + st, offset + r - st);
@@ -192,7 +192,7 @@ void getaddrinfo_server::client_connection_::process_read(timer& tm) {
 void getaddrinfo_server::client_connection_::process_write() {
     std::unique_lock<std::mutex> lg(w.rm);
 
-#if GACHI_LOGLEVEL >= 3
+#if GACHI_LOGLEVEL & 4
     errlog("\033[31mon_write():\033[0m", w.results.size());
 #endif
     if (w.results.empty()) {
@@ -216,7 +216,7 @@ getaddrinfo_server::client_connection_::client_connection_(io_api::io_context& c
         : offset(0)
         , sock(server->ssock.accept(
                 [this, server] {
-#if GACHI_LOGLEVEL >= 2
+#if GACHI_LOGLEVEL & 2
                     errlog("on_disconnect()");
 #endif
                     server->cl.erase(this);
@@ -228,7 +228,7 @@ getaddrinfo_server::client_connection_::client_connection_(io_api::io_context& c
         , timr(&ctx.get_timer(), timer::clock_t::now()
                                  + std::chrono::seconds(GACHI_TIMEOUT),
                [this, server] {
-#if GACHI_LOGLEVEL >= 2
+#if GACHI_LOGLEVEL & 2
                    errlog("\033[41mtimer_callback()\033[0m");
 #endif
                    if (is_idle())
@@ -243,7 +243,7 @@ bool getaddrinfo_server::client_connection_::client_connection_::is_idle() {
 getaddrinfo_server::getaddrinfo_server(io_api::io_context &ctx, const ipv4::endpoint &ep)
         : ssock(ctx, ep
         , [this, &ctx] {
-#if GACHI_LOGLEVEL >= 2
+#if GACHI_LOGLEVEL & 2
             errlog("on_connect()");
 #endif
             auto cc = new client_connection_(ctx, this);
