@@ -7,7 +7,10 @@
 #include <map>
 #include <queue>
 #include <sstream>
+#include <atomic>
 #include <condition_variable>
+#include <unistd.h>
+#include <term.h>
 
 #include "address.h"
 #include "io_api.h"
@@ -17,17 +20,17 @@
 #include "../dthread/dthread.h"
 
 #define GACHI_USE_DTHREAD
-#define GACHI_BUFFSIZE 64
+#define GACHI_BUFFSIZE 4
 #define GACHI_TIMEOUT 10
 
 #ifdef GACHI_USE_DTHREAD
-#define GACHI_CONNECTION_THREAD_STACK_SIZE 125
+#define GACHI_CONNECTION_THREAD_STACK_SIZE 50
 #endif
 
 // bit / result
 // 1 = errors
 // 2 = connect/disconnect/timer
-// 4 = on_read/on_write
+// 4 = on_read/on_write/not_full*
 // 8 = log requests
 #define GACHI_LOGLEVEL 1
 
@@ -35,9 +38,10 @@ namespace ipv4 {
 class getaddrinfo_server {
     struct client_connection_;
 
-public:
+private:
     server_socket ssock;
     std::map<client_connection_*, std::unique_ptr<client_connection_>> cl;
+    ipv4::socket s_control_;
 
 public:
     getaddrinfo_server(io_api::io_context&, endpoint const&);
@@ -75,14 +79,14 @@ struct getaddrinfo_server::client_connection_ {
 
 public:
     void reset_buffer() noexcept;
-    void process_read(timer& tm);
+    void process_read();
     void process_write();
     [[nodiscard]] bool is_idle() const noexcept;
     explicit client_connection_(io_api::io_context& ctx, getaddrinfo_server*);
 
 public:
+    size_t unique_id;
     bool failbit = false;
-//    int offset;
     std::string saved_buff;
     char buff[GACHI_BUFFSIZE]{};
     socket sock;

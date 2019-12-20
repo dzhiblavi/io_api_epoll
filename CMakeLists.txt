@@ -33,5 +33,5 @@ add_executable(test test_main.cpp
         ../gtest/gtest_main.cc
         ${REQ_FILES})
 
-target_link_libraries(server -lpthread)
-target_link_libraries(test -lpthread)
+target_link_libraries(server -lpthread -lncurses)
+target_link_libraries(test -lpthread -lncurses)

@@ -10,7 +10,7 @@
 #include "socket.h"
 #include "io_api.h"
 
-#define CLIENT_BUFF_SIZE 16
+#define CLIENT_BUFF_SIZE 4
 
 int max_read = 180;
 std::mutex error_log_mutex;
@@ -132,12 +132,8 @@ std::thread create_spammer(std::mutex& fm, int& fmk, int part, std::atomic_int& 
                     }
                 }
                 if (st != (int)saved_buff.size()) {
-//                    errlog("\033[41mNONFULL RECEIVE\033[0m");
                     saved_buff = saved_buff.substr(st);
-//                    std::memmove(buff, buff + st, offset + r - st);
-//                    offset = offset + r - st;
                 } else {
-//                    offset = 0;
                 }
             }
         } catch (ipv4::exception const& e) {

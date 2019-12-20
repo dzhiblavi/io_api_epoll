@@ -41,7 +41,9 @@ std::list<address> address::getaddrinfo(std::string const& hostname) {
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     std::list<address> ret;
+//    std::cerr << "GAI CALL" << std::endl;
     int r = ::getaddrinfo(hostname.c_str(), nullptr, &hints, &result);
+//    std::cerr << "GAI CALL END" << std::endl;
     if (r)
         throw ipv4::exception("address::getaddrinfo failed: " + std::string(gai_strerror(r)));
     for (addrinfo* nd = result; nd != nullptr; nd = nd->ai_next)
