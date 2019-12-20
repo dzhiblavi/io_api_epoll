@@ -44,6 +44,7 @@ public:
     ~timer_unit();
 
     void reset(timer& t, time_point_t tp);
+    void reset(time_point_t tp);
     void callback();
 };
 

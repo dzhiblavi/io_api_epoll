@@ -51,11 +51,12 @@ private:
     [[nodiscard]] uint32_t events_() const noexcept;
     [[nodiscard]] std::function<void(uint32_t)> configure_callback_() noexcept;
 
+public:
     socket(io_api::io_context& ctx, unique_fd&& fd, callback_t const& on_disconnect);
     socket(io_api::io_context& ctx, unique_fd&& fd, callback_t on_disconnect
             , callback_t on_read
             , callback_t on_write);
-public:
+
     socket(io_api::io_context& ctx, endpoint const& ep, callback_t const& on_disconnect);
     socket(io_api::io_context& ctx, endpoint const& ep, callback_t const& on_disconnect
             , callback_t const& on_read

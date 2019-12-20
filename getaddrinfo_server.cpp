@@ -81,6 +81,20 @@ dthread make_thread(size_t stack_size_pages, void** stack_addr, F&& f, Args&&...
     return ret;
 }
 #endif
+
+size_t last_id = 0;
+size_t gen_unique_id() {
+    return ++last_id;
+}
+
+void clear_terminal_screen() {
+    if (!cur_term) {
+        int result;
+        setupterm(nullptr, STDOUT_FILENO, &result);
+        if (result <= 0) return;
+    }
+    putp(tigetstr("clear"));
+}
 }
 
 namespace ipv4 {
@@ -177,7 +191,7 @@ bool getaddrinfo_server::client_connection_::worker_thread_::fail() const noexce
     return failbit;
 }
 
-void getaddrinfo_server::client_connection_::process_read(timer& tm) {
+void getaddrinfo_server::client_connection_::process_read() {
     try {
 #if GACHI_LOGLEVEL & 4
         errlog("on_read()");
@@ -210,16 +224,15 @@ void getaddrinfo_server::client_connection_::process_read(timer& tm) {
         }
         if (st != (int)saved_buff.size()) {
             saved_buff = saved_buff.substr(st);
-#if GACHI_LOGLEVEL & 1
+#if GACHI_LOGLEVEL & 4
             errlog("\033[41mnot full receive\033[0m:\t'", saved_buff, "'");
 #endif
-//            std::memmove(buff, buff + st, offset + r - st);
-//            offset = offset + r - st;
         } else {
             saved_buff.clear();
-//            offset = 0;
         }
-        timr.reset(tm, timer::clock_t::now() + std::chrono::seconds(GACHI_TIMEOUT));
+
+        // reset timer : user is active, no need to break connection
+        timr.reset(timer::clock_t::now() + std::chrono::seconds(GACHI_TIMEOUT));
     } catch (std::exception const& e) {
 #if GACHI_LOGLEVEL & 1
         failbit |= errlog("on_read() failed:", e.what());
@@ -245,13 +258,18 @@ void getaddrinfo_server::client_connection_::process_write() {
         }
 
         int r = sock.send(w.results.c_str(), w.results.size());
+
+        // reset timer : this is needed to let user get all requested information
+        if (r > 0)
+            timr.reset(timer::clock_t::now() + std::chrono::seconds(GACHI_TIMEOUT));
+
         if (r == (int) w.results.size()) {
             w.results.clear();
             sock.set_on_write({});
         } else if ((r >= 0 && r < (int) w.results.size()) || (r < 0 && errno == EINTR)) {
             r = std::max(r, 0);
             w.results = w.results.substr(r);
-#if GACHI_LOGLEVEL & 1
+#if GACHI_LOGLEVEL & 4
             errlog("\033[41mnot full write\033[0m:\t'", w.results, "'");
 #endif
         } else {
@@ -272,13 +290,12 @@ void getaddrinfo_server::client_connection_::process_write() {
 
 // pre : result mutex is locked
 void getaddrinfo_server::client_connection_::reset_buffer() noexcept {
-//    offset = 0;
     sock.set_on_write({});
 }
 
 getaddrinfo_server::client_connection_::client_connection_(io_api::io_context& ctx, ipv4::getaddrinfo_server *server)
-//    : offset(0)
-    : sock(server->ssock.accept(
+    : unique_id(gen_unique_id())
+    , sock(server->ssock.accept(
     // on_disconnect() : noexcept
     [this, server] {
 #if GACHI_LOGLEVEL & 2
@@ -288,23 +305,29 @@ getaddrinfo_server::client_connection_::client_connection_(io_api::io_context& c
     },
     // on_read() : noexcept
     [this, &ctx] {
-        process_read(ctx.get_timer());
+        process_read();
     }, {}))
     , w(this)
     , timr(&ctx.get_timer(), timer::clock_t::now()
                              + std::chrono::seconds(GACHI_TIMEOUT),
     // timer callback : noexcept
-    [this, server] {
+    [this, server, &ctx] {
 #if GACHI_LOGLEVEL & 2
         errlog("\033[41mtimer_callback()\033[0m");
 #endif
-        if (is_idle())
+        if (is_idle()) {
             server->cl.erase(this);
+        } else {
+#if GACHI_LOGLEVEL & 2
+            errlog("decided not to break connection");
+#endif
+            timr.reset(ctx.get_timer(), timer::clock_t::now() + std::chrono::seconds(GACHI_TIMEOUT));
+        }
     })
 {}
 
 bool getaddrinfo_server::client_connection_::client_connection_::is_idle() const noexcept {
-    return !w.is_working && !sock.has_on_write() && saved_buff.empty();
+    return !w.is_working;
 }
 
 getaddrinfo_server::getaddrinfo_server(io_api::io_context &ctx, const ipv4::endpoint &ep)
@@ -317,5 +340,43 @@ getaddrinfo_server::getaddrinfo_server(io_api::io_context &ctx, const ipv4::endp
         auto cc = new client_connection_(ctx, this);
         cl.emplace(cc, std::unique_ptr<client_connection_>(cc));
     })
-{}
+    , s_control_(ctx, unique_fd(0), {})
+{
+    std::cout << "gachi_server#> " << std::flush;
+
+    // assumed that s_control_ takes all control on stdout
+    s_control_.set_on_read([this] {
+        std::string s;
+        std::cin >> s;
+
+        if (s == "shutdown") {
+            // actually gai calls are not interrupted immediately
+            // so, shutting server may take some time [depending on how bad gai call is]
+            std::raise(SIGINT);
+            return;
+        } else if (s == "ls") {
+            std::cout << "#connections = " << cl.size() << std::endl;
+            for (auto const& conn : cl) {
+                std::cout << conn.second->unique_id << std::endl;
+            }
+        } else if (s == "remove") {
+            size_t uid;
+            std::cin >> uid;
+            auto it = cl.begin();
+            while (it != cl.end() && it->second->unique_id != uid)
+                ++it;
+            if (it != cl.end())
+                cl.erase(it);
+            else
+                std::cout << "no such connection id: " << uid << std::endl;
+        } else if (s == "maxid") {
+            std::cout << last_id << std::endl;
+        } else if (s == "clear") {
+            clear_terminal_screen();
+        } else {
+            std::cout << "unknown command: " << s << std::endl;
+        }
+        std::cout << "gachi_server#> " << std::flush;
+    });
+}
 }

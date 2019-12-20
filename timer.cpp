@@ -51,8 +51,15 @@ void timer_unit::reset(timer& t, time_point_t tp) {
     wpoint = tp;
     tr = &t;
     tr->add(this);
-
 }
+
+void timer_unit::reset(time_point_t tp) {
+    if (tr)
+        tr->remove(this);
+    wpoint = tp;
+    tr->add(this);
+}
+
 void timer_unit::callback() {
     cb();
 }
