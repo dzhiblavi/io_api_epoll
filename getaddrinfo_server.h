@@ -17,7 +17,7 @@
 #include "../dthread/dthread.h"
 
 #define GACHI_USE_DTHREAD
-#define GACHI_BUFFSIZE 1024
+#define GACHI_BUFFSIZE 64
 #define GACHI_TIMEOUT 10
 
 #ifdef GACHI_USE_DTHREAD
@@ -82,8 +82,9 @@ public:
 
 public:
     bool failbit = false;
+//    int offset;
+    std::string saved_buff;
     char buff[GACHI_BUFFSIZE]{};
-    int offset;
     socket sock;
     worker_thread_ w;
     timer_unit timr;

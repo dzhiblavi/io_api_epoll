@@ -25,8 +25,8 @@ bool errlog_impl_(T&& t, Args&&... args) noexcept {
 
 template <typename... Args>
 bool errlog(Args&&...args) noexcept {
+    std::unique_lock<std::mutex> lg(cerr_m);
     try {
-        std::unique_lock<std::mutex> lg(cerr_m);
         return errlog_impl_(std::forward<Args>(args)...);
     } catch (...) {
         return true;
@@ -182,17 +182,25 @@ void getaddrinfo_server::client_connection_::process_read(timer& tm) {
 #if GACHI_LOGLEVEL & 4
         errlog("on_read()");
 #endif
-        int r = sock.recv(buff + offset, GACHI_BUFFSIZE - offset);
+        // I1 : buffer does not contain useful information
+        // all needed data is stored in saved_buff
+        //
+        // I2 : saved_buff does not contain full request, i.e. substr(saved_buff, "\r\n") = -1
+        int r = sock.recv(buff, GACHI_BUFFSIZE);
         if (r < 0) {
             if (errno == EINTR)
                 return;
             IPV4_EXC(std::to_string(errno));
         }
 
+        int start_point = (int)saved_buff.size();
+        saved_buff += std::string(buff, buff + r);
+
         int st = 0;
-        for (int i = 0; i < offset + r - 1; ++i) {
-            if (buff[i] == '\r' && buff[i + 1] == '\n') {
-                std::string host(buff + st, buff + i);
+        // the last character in saved_buff could be '\n'
+        for (int i = std::max(0, start_point - 1); i < (int)saved_buff.size() - 1; ++i) {
+            if (saved_buff[i] == '\r' && saved_buff[i + 1] == '\n') {
+                std::string host(saved_buff.data() + st, saved_buff.data() + i);
 #if GACHI_LOGLEVEL & 8
                 errlog("adding task: '" + host + "'");
 #endif
@@ -200,14 +208,16 @@ void getaddrinfo_server::client_connection_::process_read(timer& tm) {
                 st = i + 2;
             }
         }
-        if (st != offset + r) {
+        if (st != (int)saved_buff.size()) {
+            saved_buff = saved_buff.substr(st);
 #if GACHI_LOGLEVEL & 1
-            errlog("\033[41mnot full receive\033[0m:\t", std::string(buff + st, buff + offset + r));
+            errlog("\033[41mnot full receive\033[0m:\t'", saved_buff, "'");
 #endif
-            std::memmove(buff, buff + st, offset + r - st);
-            offset = offset + r - st;
+//            std::memmove(buff, buff + st, offset + r - st);
+//            offset = offset + r - st;
         } else {
-            offset = 0;
+            saved_buff.clear();
+//            offset = 0;
         }
         timr.reset(tm, timer::clock_t::now() + std::chrono::seconds(GACHI_TIMEOUT));
     } catch (std::exception const& e) {
@@ -241,6 +251,9 @@ void getaddrinfo_server::client_connection_::process_write() {
         } else if ((r >= 0 && r < (int) w.results.size()) || (r < 0 && errno == EINTR)) {
             r = std::max(r, 0);
             w.results = w.results.substr(r);
+#if GACHI_LOGLEVEL & 1
+            errlog("\033[41mnot full write\033[0m:\t'", w.results, "'");
+#endif
         } else {
             IPV4_EXC(std::to_string(errno));
         }
@@ -259,13 +272,13 @@ void getaddrinfo_server::client_connection_::process_write() {
 
 // pre : result mutex is locked
 void getaddrinfo_server::client_connection_::reset_buffer() noexcept {
-    offset = 0;
+//    offset = 0;
     sock.set_on_write({});
 }
 
 getaddrinfo_server::client_connection_::client_connection_(io_api::io_context& ctx, ipv4::getaddrinfo_server *server)
-    : offset(0)
-    , sock(server->ssock.accept(
+//    : offset(0)
+    : sock(server->ssock.accept(
     // on_disconnect() : noexcept
     [this, server] {
 #if GACHI_LOGLEVEL & 2
@@ -291,7 +304,7 @@ getaddrinfo_server::client_connection_::client_connection_(io_api::io_context& c
 {}
 
 bool getaddrinfo_server::client_connection_::client_connection_::is_idle() const noexcept {
-    return !w.is_working && !sock.has_on_write() && offset == 0;
+    return !w.is_working && !sock.has_on_write() && saved_buff.empty();
 }
 
 getaddrinfo_server::getaddrinfo_server(io_api::io_context &ctx, const ipv4::endpoint &ep)

@@ -10,7 +10,7 @@
 #include "socket.h"
 #include "io_api.h"
 
-#define CLIENT_BUFF_SIZE 128
+#define CLIENT_BUFF_SIZE 16
 
 int max_read = 180;
 std::mutex error_log_mutex;
@@ -90,25 +90,30 @@ std::thread create_spammer(std::mutex& fm, int& fmk, int part, std::atomic_int& 
                     lhosts[i] = hosts[fmk++] + "\r\n";
             }
             ipv4::basic_socket sock(ipv4::endpoint(ipv4::address::any(), 3333));
-            for (auto const &host : lhosts)
-                // hope that all hostname would be sent
-                sock.send(host.c_str(), host.size());
+            for (auto const &host : lhosts) {
+                int r = 0;
+                while (r < (int)host.size()) {
+                    r += sock.send(host.c_str() + r, host.size() - r);
+                }
+            }
 
             // receive
+            std::string saved_buff;
             char buff[CLIENT_BUFF_SIZE];
             int n = 0;
-            int offset = 0;
+
             while (n < part) {
-                int r = sock.recv(buff + offset, CLIENT_BUFF_SIZE - offset);
-                buff[offset + r] = '\0';
+                int r = sock.recv(buff, CLIENT_BUFF_SIZE);
+                int start_point = saved_buff.size();
+                saved_buff += std::string(buff, buff + r);
                 if (r == 0)
                     break;
                 if (r < 0)
                     continue;
                 int st = 0;
-                for (int i = 0; i < offset + r - 1; ++i) {
-                    if (buff[i] == '\r' && buff[i + 1] == '\n') {
-                        std::string returned(buff + st, buff + i);
+                for (int i = std::max(0, start_point - 1); i < (int)saved_buff.size() - 1; ++i) {
+                    if (saved_buff[i] == '\r' && saved_buff[i + 1] == '\n') {
+                        std::string returned(saved_buff.data() + st, saved_buff.data() + i);
 //                            errlog("resolved: " + returned);
                         if (returned[0] != '[') {
                             std::string hm, res;
@@ -126,12 +131,13 @@ std::thread create_spammer(std::mutex& fm, int& fmk, int part, std::atomic_int& 
                         ++total;
                     }
                 }
-                if (st != offset + r) {
-                    errlog("\033[41mNONFULL RECEIVE\033[0m");
-                    std::memmove(buff, buff + st, offset + r - st);
-                    offset = offset + r - st;
+                if (st != (int)saved_buff.size()) {
+//                    errlog("\033[41mNONFULL RECEIVE\033[0m");
+                    saved_buff = saved_buff.substr(st);
+//                    std::memmove(buff, buff + st, offset + r - st);
+//                    offset = offset + r - st;
                 } else {
-                    offset = 0;
+//                    offset = 0;
                 }
             }
         } catch (ipv4::exception const& e) {
