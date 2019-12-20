@@ -3,7 +3,7 @@
 namespace {
 std::mutex cerr_m;
 
-#ifdef DEBUG
+#if GACHI_LOGLEVEL > 0
 void errlog_impl_() {
     std::cerr << std::endl;
 }
@@ -43,6 +43,24 @@ std::string form_response(std::string const& host) {
     }
     return resstr.str();
 }
+
+#ifdef GACHI_USE_DTHREAD
+template <typename F, typename... Args>
+dthread make_thread(size_t stack_size_pages, void** stack_addr, F&& f, Args&&... args) {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    int ps = getpagesize();
+    posix_memalign(stack_addr, ps, ps * stack_size_pages);
+
+    if (pthread_attr_setstack(&attr, &stack_addr, ps * 10))
+        throw std::runtime_error("failed to change stack_size");
+
+    auto ret = dthread(&attr, std::forward<F>(f), std::forward<Args>(args)...);
+    pthread_attr_destroy(&attr);
+
+    return ret;
+}
+#endif
 }
 
 namespace ipv4 {
@@ -52,54 +70,64 @@ getaddrinfo_server::client_connection_::worker_thread_::worker_thread_(client_co
         , quit(false)
         , failbit(false)
         , th(
-                [this] {
-                    for (;;) {
-                        is_working = false;
-                        std::unique_lock<std::mutex> lg(tm);
-                        cv.wait(lg, [this] {
-                            return quit || !tasks.empty();
-                        });
-                        is_working = true;
-                        if (quit)
-                            break;
+#ifdef GACHI_USE_DTHREAD
+                make_thread(GACHI_CONNECTION_THREAD_STACK_SIZE, &stack,
+#endif
+                            [this] {
+                                for (;;) {
+                                    is_working = false;
+                                    std::unique_lock<std::mutex> lg(tm);
+                                    cv.wait(lg, [this] {
+                                        return quit || !tasks.empty();
+                                    });
+                                    is_working = true;
+                                    if (quit)
+                                        break;
 
-                        auto hostname = std::move(tasks.front());
-                        tasks.pop();
-                        lg.unlock();
+                                    auto hostname = std::move(tasks.front());
+                                    tasks.pop();
+                                    lg.unlock();
 
-                        std::string res;
-                        try {
-                            try {
-                                res = form_response(hostname);
-                            } catch (ipv4::exception const &e) {
-                                res = fail_message(hostname, e.what());
-                            } catch (...) {
-                                res = fail_message(hostname, "unknown reason");
-                            }
-                        } catch (...) {
-                            errlog("ERROR");
-                            failbit = true;
-                        }
+                                    std::string res;
+                                    try {
+                                        try {
+                                            res = form_response(hostname);
+                                        } catch (ipv4::exception const &e) {
+                                            res = fail_message(hostname, e.what());
+                                        } catch (...) {
+                                            res = fail_message(hostname, "unknown reason");
+                                        }
+                                    } catch (...) {
+#if GACHI_LOGLEVEL >= 1
+                                        errlog("ERROR");
+#endif
+                                        failbit = true;
+                                    }
 
-                        if (quit)
-                            break;
+                                    if (quit)
+                                        break;
 
-                        try {
-                            std::unique_lock<std::mutex> lg_res(rm);
-                            results += res + "\r\n";
+                                    try {
+                                        std::unique_lock<std::mutex> lg_res(rm);
+                                        results += res + "\r\n";
 
-                            if (!this->conn->sock.has_on_write()) {
-                                this->conn->sock.set_on_write([this] {
-                                    this->conn->process_write();
-                                });
-                            }
-                        } catch (...) {
-                            // doing nothing about this; let client repeat his request
-                            errlog("ERROR");
-                            failbit = true;
-                        }
-                    }
-                })
+                                        if (!this->conn->sock.has_on_write()) {
+                                            this->conn->sock.set_on_write([this] {
+                                                this->conn->process_write();
+                                            });
+                                        }
+                                    } catch (...) {
+                                        // doing nothing about this; let client repeat his request
+#if GACHI_LOGLEVEL >= 1
+                                        errlog("ERROR");
+#endif
+                                        failbit = true;
+                                    }
+                                }
+                            })
+#ifdef GACHI_USE_DTHREAD
+        )
+#endif
 {}
 
 getaddrinfo_server::client_connection_::worker_thread_::~worker_thread_() {
@@ -110,6 +138,9 @@ getaddrinfo_server::client_connection_::worker_thread_::~worker_thread_() {
     }
     cv.notify_one();
     th.join();
+#ifdef GACHI_USE_DTHREAD
+    free(stack);
+#endif
 }
 
 void getaddrinfo_server::client_connection_::worker_thread_::add_task(std::string const& hostname) {
@@ -125,8 +156,10 @@ bool getaddrinfo_server::client_connection_::worker_thread_::fail() const noexce
 }
 
 void getaddrinfo_server::client_connection_::process_read(timer& tm) {
+#if GACHI_LOGLEVEL >= 3
     errlog("on_read()");
-    int r = sock.recv(buff + offset, GETADDRINFO_BUFSIZE - offset);
+#endif
+    int r = sock.recv(buff + offset, GACHI_BUFFSIZE - offset);
     if (r < 0) {
         if (errno == EINTR)
             return;
@@ -137,25 +170,31 @@ void getaddrinfo_server::client_connection_::process_read(timer& tm) {
     for (int i = 0; i < offset + r - 1; ++i) {
         if (buff[i] == '\r' && buff[i + 1] == '\n') {
             std::string host(buff + st, buff + i);
+#if GACHI_LOGLEVEL >= 4
             errlog("adding task: '" + host + "'");
+#endif
             w.add_task(host);
             st = i + 2;
         }
     }
     if (st != offset + r) {
-        errlog("\033[41mNOT FULL RECEIVE\033[0m:\t", std::string(buff + st, buff + offset + r));
+#if GACHI_LOGLEVEL >= 3
+        errlog("\033[41mnot full receive\033[0m:\t", std::string(buff + st, buff + offset + r));
+#endif
         std::memmove(buff, buff + st, offset + r - st);
         offset = offset + r - st;
     } else {
         offset = 0;
     }
-    timr.reset(tm, timer::clock_t::now() + std::chrono::seconds(GETADDRINFO_TIMEOUT));
+    timr.reset(tm, timer::clock_t::now() + std::chrono::seconds(GACHI_TIMEOUT));
 }
 
 void getaddrinfo_server::client_connection_::process_write() {
     std::unique_lock<std::mutex> lg(w.rm);
 
+#if GACHI_LOGLEVEL >= 3
     errlog("\033[31mon_write():\033[0m", w.results.size());
+#endif
     if (w.results.empty()) {
         sock.set_on_write({});
         return;
@@ -174,23 +213,27 @@ void getaddrinfo_server::client_connection_::process_write() {
 }
 
 getaddrinfo_server::client_connection_::client_connection_(io_api::io_context& ctx, ipv4::getaddrinfo_server *server)
-    : offset(0)
-    , sock(server->ssock.accept(
-    [this, server] {
-        errlog("on_disconnect()");
-        server->cl.erase(this);
-    },
-    [this, &ctx] {
-        process_read(ctx.get_timer());
-    }, {}))
-    , w(this)
-    , timr(&ctx.get_timer(), timer::clock_t::now()
-        + std::chrono::seconds(GETADDRINFO_TIMEOUT),
-    [this, server] {
-        errlog("\033[41mtimer_callback()\033[0m");
-        if (is_idle())
-            server->cl.erase(this);
-    })
+        : offset(0)
+        , sock(server->ssock.accept(
+                [this, server] {
+#if GACHI_LOGLEVEL >= 2
+                    errlog("on_disconnect()");
+#endif
+                    server->cl.erase(this);
+                },
+                [this, &ctx] {
+                    process_read(ctx.get_timer());
+                }, {}))
+        , w(this)
+        , timr(&ctx.get_timer(), timer::clock_t::now()
+                                 + std::chrono::seconds(GACHI_TIMEOUT),
+               [this, server] {
+#if GACHI_LOGLEVEL >= 2
+                   errlog("\033[41mtimer_callback()\033[0m");
+#endif
+                   if (is_idle())
+                       server->cl.erase(this);
+               })
 {}
 
 bool getaddrinfo_server::client_connection_::client_connection_::is_idle() {
@@ -198,11 +241,13 @@ bool getaddrinfo_server::client_connection_::client_connection_::is_idle() {
 }
 
 getaddrinfo_server::getaddrinfo_server(io_api::io_context &ctx, const ipv4::endpoint &ep)
-    : ssock(ctx, ep
-    , [this, &ctx] {
-        errlog("on_connect()");
-        auto cc = new client_connection_(ctx, this);
-        cl.emplace(cc, std::unique_ptr<client_connection_>(cc));
-    })
+        : ssock(ctx, ep
+        , [this, &ctx] {
+#if GACHI_LOGLEVEL >= 2
+            errlog("on_connect()");
+#endif
+            auto cc = new client_connection_(ctx, this);
+            cl.emplace(cc, std::unique_ptr<client_connection_>(cc));
+        })
 {}
 }

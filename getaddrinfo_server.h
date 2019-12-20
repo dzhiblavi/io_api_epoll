@@ -16,9 +16,19 @@
 
 #include "../dthread/dthread.h"
 
-#define GETADDRINFO_BUFSIZE 1024
-#define GETADDRINFO_TIMEOUT 10
-#define CONNECTION_THREAD_STACK_SIZE 512
+#define GACHI_USE_DTHREAD
+#define GACHI_BUFFSIZE 1024
+#define GACHI_TIMEOUT 10
+
+#ifdef GACHI_USE_DTHREAD
+#define GACHI_CONNECTION_THREAD_STACK_SIZE 125
+#endif
+
+// 1 = only errors
+// 2 = 1 + connect/disconnect/timer
+// 3 = 2 + on_read/on_write
+// 4 = all
+#define GACHI_LOGLEVEL 1
 
 namespace ipv4 {
 class getaddrinfo_server {
@@ -54,9 +64,12 @@ struct getaddrinfo_server::client_connection_ {
         std::condition_variable cv;
         std::mutex tm;
         std::mutex rm;
+#ifdef GACHI_USE_DTHREAD
+        dthread th;
+        void* stack;
+#else
         std::thread th;
-//        dthread th;
-//        void* stack;
+#endif
     };
 
 public:
@@ -66,7 +79,7 @@ public:
     explicit client_connection_(io_api::io_context& ctx, getaddrinfo_server*);
 
 public:
-    char buff[GETADDRINFO_BUFSIZE]{};
+    char buff[GACHI_BUFFSIZE]{};
     int offset;
     socket sock;
     worker_thread_ w;

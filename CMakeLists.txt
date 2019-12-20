@@ -8,6 +8,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -DDEBUG")
 
 set(REQ_FILES
         ../dthread/dthread.h
+        ../dthread/dthread.cpp
         address.h
         address.cpp
         unique_fd.cpp
