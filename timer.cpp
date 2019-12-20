@@ -4,7 +4,7 @@ void timer::add(timer_unit* e) {
     timers.insert({e->wpoint, e});
 }
 
-void timer::remove(timer_unit* e) {
+void timer::remove(timer_unit* e) noexcept {
     auto it = timers.find({e->wpoint, e});
     timers.erase(it);
 }
@@ -13,15 +13,20 @@ bool timer::empty() const noexcept {
     return timers.empty();
 }
 
-timer::time_point_t timer::top() const {
+timer::time_point_t timer::top() const noexcept {
+    assert(!timers.empty());
     return timers.begin()->second->wpoint;
 }
 
-void timer::callback(time_point_t base) {
+void timer::callback(time_point_t base) noexcept {
     auto it = timers.begin();
     while (it != timers.end() && it->first <= base) {
         it->second->tr = nullptr;
-        it->second->callback();
+        try {
+            it->second->callback();
+        } catch (...) {
+            // callback is considered to be non-throwing
+        }
         ++it;
     }
     timers.erase(timers.begin(), it);

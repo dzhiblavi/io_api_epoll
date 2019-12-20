@@ -24,7 +24,7 @@ private:
     timer tm;
 
 private:
-    int call_and_timeout();
+    int call_and_timeout() noexcept;
 
 public:
     io_context();
@@ -34,8 +34,8 @@ public:
     io_context(io_context&&) noexcept;
     io_context& operator=(io_context&&) noexcept;
 
-    void exec();
-    timer& get_timer();
+    void exec() noexcept;
+    timer& get_timer() noexcept;
     friend void swap(io_context&, io_context&) noexcept;
 };
 

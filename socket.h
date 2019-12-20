@@ -30,8 +30,8 @@ public:
     basic_socket(basic_socket&&) noexcept = default;
     basic_socket& operator=(basic_socket&&) noexcept = default;
 
-    int recv(void* buff, size_t max_len);
-    int send(void const* buff, size_t max_len);
+    int recv(void* buff, size_t max_len) noexcept;
+    int send(void const* buff, size_t max_len) noexcept;
 };
 
 class socket : private basic_socket {
@@ -94,8 +94,8 @@ public:
 
     socket accept(callback_t const& on_disconnect);
     socket accept(callback_t const& on_disconnect
-            , callback_t const& on_read
-            , callback_t const& on_write);
+                , callback_t const& on_read
+                , callback_t const& on_write);
 };
 } // namespace ipv4
 

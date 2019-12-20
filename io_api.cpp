@@ -1,7 +1,9 @@
 #include "io_api.h"
 
+#define IO_API_SIG_BOOL
+
 namespace {
-volatile bool* quit = nullptr;
+#ifdef IO_API_SIG_EFD
 volatile int evn = -1;
 
 void signal_handler(int) {
@@ -9,10 +11,23 @@ void signal_handler(int) {
     ::eventfd_write(evn, 0);
 }
 
-void bsignal_handler(int) {
+void create_notifier(int efd) {
+    epoll_event notifier{};
+    evn = eventfd(0, 0);
+    if (evn < 0)
+        IPV4_EXC(std::to_string(errno));
+    notifier.events = EPOLLIN;
+    notifier.data.fd = evn;
+    api_epoll_ctl(efd, EPOLL_CTL_ADD, evn, &notifier);
+}
+#else
+volatile bool* quit = nullptr;
+
+void signal_handler(int) {
     if (!quit) return;
     *quit = true;
 }
+#endif
 
 int api_epoll_create() {
     int efd = epoll_create(100000);
@@ -30,16 +45,6 @@ void api_epoll_ctl(int efd, int op, int fd, epoll_event* event) {
     if (r < 0)
         IPV4_EXC(std::to_string(errno));
 }
-
-void create_notifier(int efd) {
-    epoll_event notifier{};
-    evn = eventfd(0, 0);
-    if (evn < 0)
-        IPV4_EXC(std::to_string(errno));
-    notifier.events = EPOLLIN;
-    notifier.data.fd = evn;
-    api_epoll_ctl(efd, EPOLL_CTL_ADD, evn, &notifier);
-}
 }
 
 namespace io_api {
@@ -56,55 +61,70 @@ io_context& io_context::operator=(io_context&& rhs) noexcept {
     return *this;
 }
 
-void io_context::exec() {
-//    std::signal(SIGINT, signal_handler);
-//    std::signal(SIGTERM, signal_handler);
+void io_context::exec() noexcept {
+#ifdef IO_API_SIG_EFD
+    create_notifier(efd_.fd());
+    unique_fd event_uq(evn);
+#else
     bool quitf = false;
     quit = &quitf;
-    std::signal(SIGINT, bsignal_handler);
-    std::signal(SIGTERM, bsignal_handler);
-
-//    create_notifier(efd_.fd());
-//    unique_fd event_uq(evn);
+#endif
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
 
     std::array<epoll_event, IPV4_EPOLL_MAX> events{};
     for (;;) {
-        if (quitf)goto end;
-        int nfd = api_epoll_wait(efd_.fd(), events.data(), events.size(), call_and_timeout());
+#ifndef IO_API_SIG_EFD
         if (quitf) goto end;
+#endif
+        int nfd = api_epoll_wait(efd_.fd(), events.data(), events.size(), call_and_timeout());
+#ifndef IO_API_SIG_EFD
+        if (quitf) goto end;
+#endif
 
         if (nfd < 0) {
-            if (errno == EINTR) {
-                goto end;
-            } else {
-                IPV4_EXC(std::to_string(nfd));
-            }
+            if (errno != EINTR)
+                std::cerr << "epoll_wait() failed, errno = " << errno << std::endl;
+            goto end;
         }
 
         for (auto it = events.begin(); it != events.begin() + nfd; ++it) {
+#ifdef IO_API_SIG_EFD
+            if (it->data.fd == evn) goto end;
+#else
             if (quitf) goto end;
-//            if (it->data.fd == evn) goto end;
-            static_cast<io_unit *>(it->data.ptr)->callback(it->events);
+#endif
+            try {
+                static_cast<io_unit *>(it->data.ptr)->callback(it->events);
+            } catch (...) {
+                // callback is considered to be non-throwing
+            }
         }
     }
 
-end:
+    end:
+#ifdef IO_API_SIG_EFD
     evn = -1;
+#endif
+    return;
 }
 
-timer& io_context::get_timer() {
+timer& io_context::get_timer() noexcept {
     return tm;
 }
 
-int io_context::call_and_timeout() {
+int io_context::call_and_timeout() noexcept {
     if (tm.empty())
         return -1;
 
     timer::clock_t::time_point now = timer::clock_t::now();
+
+    static_assert(noexcept(tm.callback(now)));
     tm.callback(now);
 
     if (tm.empty())
         return -1;
+
     return std::chrono::duration_cast<std::chrono::milliseconds>(tm.top() - now).count();
 }
 
@@ -149,6 +169,8 @@ io_unit& io_unit::operator=(io_api::io_unit&& rhs) noexcept {
 io_unit::~io_unit() {
     if (!ctx_) return;
     epoll_event event{events_, {this}};
+
+    // std::terminate can be called. ok
     api_epoll_ctl(ctx_->efd_.fd(), EPOLL_CTL_DEL, fd_, &event);
 }
 

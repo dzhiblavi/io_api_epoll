@@ -9,7 +9,7 @@
                         + " on line: " + std::to_string(__LINE__))
 
 namespace ipv4 {
-class exception : std::runtime_error {
+class exception : public std::runtime_error {
 public:
     using std::runtime_error::runtime_error;
     using std::runtime_error::what;

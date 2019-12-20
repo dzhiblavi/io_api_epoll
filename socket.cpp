@@ -54,11 +54,11 @@ int sock_accept(int fd) {
 }
 
 namespace ipv4 {
-int basic_socket::recv(void* buff, size_t max_len) {
+int basic_socket::recv(void* buff, size_t max_len) noexcept {
     return sock_recv(fd_.fd(), buff, max_len);
 }
 
-int basic_socket::send(void const* buff, size_t max_len) {
+int basic_socket::send(void const* buff, size_t max_len) noexcept {
     return sock_send(fd_.fd(), buff, max_len);
 }
 
@@ -99,7 +99,7 @@ std::function<void(uint32_t)> socket::configure_callback_() noexcept {
             if (flags & EPOLLOUT)
                 this->on_write_();
         } catch (...) {
-            // ignore any errors in callbacks
+            // callback considered to be non-throwing
         }
         destroyed_ = old_destroyed;
     };
@@ -127,8 +127,8 @@ socket::socket(io_api::io_context& ctx, endpoint const& ep, callback_t const& on
 socket::socket(io_api::io_context& ctx, endpoint const& ep, callback_t const& on_disconnect
                                                           , callback_t const& on_read
                                                           , callback_t const& on_write)
-        : socket(ctx, unique_fd(sock_create(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)),
-                on_disconnect, on_read, on_write)
+    : socket(ctx, unique_fd(sock_create(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)),
+            on_disconnect, on_read, on_write)
 {
     sock_connect(fd_.fd(), ep);
 }

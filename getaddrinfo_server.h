@@ -29,7 +29,7 @@
 // 2 = connect/disconnect/timer
 // 4 = on_read/on_write
 // 8 = log requests
-#define GACHI_LOGLEVEL 15
+#define GACHI_LOGLEVEL 1
 
 namespace ipv4 {
 class getaddrinfo_server {
@@ -74,12 +74,14 @@ struct getaddrinfo_server::client_connection_ {
     };
 
 public:
+    void reset_buffer() noexcept;
     void process_read(timer& tm);
     void process_write();
-    bool is_idle();
+    [[nodiscard]] bool is_idle() const noexcept;
     explicit client_connection_(io_api::io_context& ctx, getaddrinfo_server*);
 
 public:
+    bool failbit = false;
     char buff[GACHI_BUFFSIZE]{};
     int offset;
     socket sock;

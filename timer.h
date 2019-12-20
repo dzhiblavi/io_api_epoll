@@ -4,6 +4,7 @@
 #include <functional>
 #include <chrono>
 #include <set>
+#include <cassert>
 
 class timer_unit;
 
@@ -16,14 +17,14 @@ private:
     std::set<std::pair<time_point_t, timer_unit*>> timers;
 
 public:
-    timer() = default;
+    timer() noexcept = default;
 
     void add(timer_unit* e);
-    void remove(timer_unit* e);
+    void remove(timer_unit* e) noexcept;
 
     [[nodiscard]] bool empty() const noexcept;
-    [[nodiscard]] time_point_t top() const;
-    void callback(time_point_t base);
+    [[nodiscard]] time_point_t top() const noexcept;
+    void callback(time_point_t base) noexcept;
 };
 
 class timer_unit {
