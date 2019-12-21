@@ -42,7 +42,7 @@ TEST(basic, simple2) {
 }
 
 TEST(routine, load_file) {
-    std::ifstream fin("/home/dzhiblavi/Documents/prog/cpp/code/io_api_epoll/build/hosts2.txt");
+    std::ifstream fin("/home/dzhiblavi/Documents/prog/cpp/code/io_api_epoll/hosts2.txt");
     if (fin.fail())
         std::cerr << "failed to open file [simple3]" << std::endl;
     std::string host;
