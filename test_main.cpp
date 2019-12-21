@@ -105,14 +105,15 @@ std::thread create_spammer(std::mutex& fm, int& fmk, int part, std::atomic_int& 
             while (n < part) {
                 int r = sock.recv(buff, CLIENT_BUFF_SIZE);
                 int start_point = saved_buff.size();
-                saved_buff += std::string(buff, buff + r);
                 if (r == 0)
                     break;
                 if (r < 0)
                     continue;
                 int st = 0;
+                saved_buff += std::string(buff, buff + r);
                 for (int i = std::max(0, start_point - 1); i < (int)saved_buff.size() - 1; ++i) {
                     if (saved_buff[i] == '\r' && saved_buff[i + 1] == '\n') {
+                        assert(st <= i);
                         std::string returned(saved_buff.data() + st, saved_buff.data() + i);
 //                            errlog("resolved: " + returned);
                         if (returned[0] != '[') {
@@ -121,6 +122,7 @@ std::thread create_spammer(std::mutex& fm, int& fmk, int part, std::atomic_int& 
                             while (!(returned[j] == ':' && returned[j + 1] == ':')) {
                                 ++j;
                             }
+                            assert(j >= 0);
                             hm = std::string(returned.data(), returned.data() + j);
                             res = returned.substr(j + 2);
 //                                errlog("parsed: " + hm + "->" + res);

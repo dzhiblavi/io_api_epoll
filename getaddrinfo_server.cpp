@@ -359,6 +359,11 @@ getaddrinfo_server::getaddrinfo_server(io_api::io_context &ctx, const ipv4::endp
             for (auto const& conn : cl) {
                 std::cout << conn.second->unique_id << std::endl;
             }
+        } else if (s == "lswork") {
+            std::cout << "#workers = " << cl.size() << std::endl;
+            for (auto const& conn : cl) {
+                std::cout << conn.second->unique_id << ":" << !conn.second->is_idle() << std::endl;
+            }
         } else if (s == "rm") {
             size_t uid;
             std::cin >> uid;
@@ -369,6 +374,8 @@ getaddrinfo_server::getaddrinfo_server(io_api::io_context &ctx, const ipv4::endp
                 cl.erase(it);
             else
                 std::cout << "no such connection id: " << uid << std::endl;
+        } else if (s == "dropall") {
+            cl.clear();
         } else if (s == "maxid") {
             std::cout << last_id << std::endl;
         } else if (s == "clear") {
