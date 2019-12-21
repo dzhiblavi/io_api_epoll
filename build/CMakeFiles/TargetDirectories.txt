@@ -1,0 +1,4 @@
+/home/dzhiblavi/Documents/prog/cpp/code/io_api_epoll/build/CMakeFiles/rebuild_cache.dir
+/home/dzhiblavi/Documents/prog/cpp/code/io_api_epoll/build/CMakeFiles/edit_cache.dir
+/home/dzhiblavi/Documents/prog/cpp/code/io_api_epoll/build/CMakeFiles/server.dir
+/home/dzhiblavi/Documents/prog/cpp/code/io_api_epoll/build/CMakeFiles/test.dir

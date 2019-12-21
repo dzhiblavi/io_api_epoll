@@ -349,7 +349,7 @@ getaddrinfo_server::getaddrinfo_server(io_api::io_context &ctx, const ipv4::endp
         std::string s;
         std::cin >> s;
 
-        if (s == "shutdown") {
+        if (s == "exit") {
             // actually gai calls are not interrupted immediately
             // so, shutting server may take some time [depending on how bad gai call is]
             std::raise(SIGINT);
@@ -359,7 +359,7 @@ getaddrinfo_server::getaddrinfo_server(io_api::io_context &ctx, const ipv4::endp
             for (auto const& conn : cl) {
                 std::cout << conn.second->unique_id << std::endl;
             }
-        } else if (s == "remove") {
+        } else if (s == "rm") {
             size_t uid;
             std::cin >> uid;
             auto it = cl.begin();
