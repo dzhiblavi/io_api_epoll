@@ -17,10 +17,10 @@
 #include "socket.h"
 #include "timer.h"
 
-#include "../dthread/dthread.h"
+#include "dthread/dthread.h"
 
 #define GACHI_USE_DTHREAD
-#define GACHI_BUFFSIZE 4
+#define GACHI_BUFFSIZE 128
 #define GACHI_TIMEOUT 10
 
 #ifdef GACHI_USE_DTHREAD
@@ -32,7 +32,7 @@
 // 2 = connect/disconnect/timer
 // 4 = on_read/on_write/not_full*
 // 8 = log requests
-#define GACHI_LOGLEVEL 1
+#define GACHI_LOGLEVEL 15
 
 namespace ipv4 {
 class getaddrinfo_server {

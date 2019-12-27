@@ -27,9 +27,8 @@ void timer::callback(time_point_t base) noexcept {
         } catch (...) {
             // callback is considered to be non-throwing
         }
-        ++it;
+        it = timers.erase(it);
     }
-    timers.erase(timers.begin(), it);
 }
 
 timer_unit::timer_unit(timer *timer, timer::time_point_t wpoint, timer_unit::callback_t callback)
