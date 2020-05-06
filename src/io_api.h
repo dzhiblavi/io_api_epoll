@@ -1,12 +1,6 @@
 #ifndef NET_IO_API_H
 #define NET_IO_API_H
 
-#ifdef __APPLE__
-#else
-#include <sys/epoll.h>
-#include <sys/eventfd.h>
-#endif
-
 #include <functional>
 #include <array>
 #include <iostream>
