@@ -3,12 +3,11 @@
 #include <mutex>
 #include <thread>
 #include <atomic>
-#include <map>
 
-#include "../gtest/gtest.h"
+#include "gtest/gtest.h"
 
-#include "socket.h"
-#include "io_api.h"
+#include "src/socket.h"
+#include "src/io_api.h"
 
 #define CLIENT_BUFF_SIZE 4
 
@@ -37,12 +36,13 @@ TEST(basic, simple1) {
 
 TEST(basic, simple2) {
     io_api::io_context ctx;
+    poll::flag a = {0, 0, 0};
     for (int i = 0; i < 100; ++i)
-        io_api::io_unit unit(&ctx, 0, 0, [](uint32_t) {});
+        io_api::io_unit unit(&ctx, a, 0, [](poll::flag const&) {});
 }
 
 TEST(routine, load_file) {
-    std::ifstream fin("/home/dzhiblavi/Documents/prog/cpp/code/io_api_epoll/hosts2.txt");
+    std::ifstream fin("../hosts2.txt");
     if (fin.fail())
         std::cerr << "failed to open file [simple3]" << std::endl;
     std::string host;
@@ -138,7 +138,7 @@ std::thread create_spammer(std::mutex& fm, int& fmk, int part, std::atomic_int& 
                 } else {
                 }
             }
-        } catch (ipv4::exception const& e) {
+        } catch (ipv4::error const& e) {
             errlog(e.what());
         }
     });

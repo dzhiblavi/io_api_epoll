@@ -1,5 +1,5 @@
-#ifndef WEB_CRACKER_UNIQUE_FD_H
-#define WEB_CRACKER_UNIQUE_FD_H
+#ifndef NET_UNIQUE_FD_H
+#define NET_UNIQUE_FD_H
 
 #include <unistd.h>
 #include <algorithm>
@@ -19,9 +19,9 @@ public:
     unique_fd(unique_fd&&) noexcept;
     unique_fd& operator=(unique_fd&&) noexcept;
 
-    [[nodiscard]] int fd() const noexcept;
+    [[nodiscard]] int native_handle() const noexcept;
 
     friend void swap(unique_fd&, unique_fd&) noexcept;
 };
 
-#endif //WEB_CRACKER_UNIQUE_FD_H
+#endif // NET_UNIQUE_FD_H

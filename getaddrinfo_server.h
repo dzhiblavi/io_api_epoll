@@ -12,14 +12,14 @@
 #include <unistd.h>
 #include <term.h>
 
-#include "address.h"
-#include "io_api.h"
-#include "socket.h"
-#include "timer.h"
+#include "src/address.h"
+#include "src/io_api.h"
+#include "src/socket.h"
+#include "src/timer.h"
 
 #include "dthread/dthread.h"
 
-#define GACHI_USE_DTHREAD
+//#define GACHI_USE_DTHREAD
 #define GACHI_BUFFSIZE 128
 #define GACHI_TIMEOUT 10
 
@@ -81,10 +81,12 @@ public:
     void reset_buffer() noexcept;
     void process_read();
     void process_write();
+    void disconnect();
     [[nodiscard]] bool is_idle() const noexcept;
     explicit client_connection_(io_api::io_context& ctx, getaddrinfo_server*);
 
 public:
+    getaddrinfo_server* srv;
     size_t unique_id;
     bool failbit = false;
     std::string saved_buff;

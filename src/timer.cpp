@@ -14,47 +14,54 @@ bool timer::empty() const noexcept {
 }
 
 timer::time_point_t timer::top() const noexcept {
-    assert(!timers.empty());
+    assert(!empty());
     return timers.begin()->second->wpoint;
 }
 
 void timer::callback(time_point_t base) noexcept {
     auto it = timers.begin();
+
     while (it != timers.end() && it->first <= base) {
         it->second->tr = nullptr;
+
         try {
             it->second->callback();
         } catch (...) {
-            // callback is considered to be non-throwing
+
         }
+
         it = timers.erase(it);
     }
 }
 
 timer_unit::timer_unit(timer *timer, timer::time_point_t wpoint, timer_unit::callback_t callback)
-    : tr(timer)
-    , cb(std::move(callback))
-    , wpoint(wpoint)
-{
+        : tr(timer)
+        , cb(std::move(callback))
+        , wpoint(wpoint) {
     tr->add(this);
 }
 
 timer_unit::~timer_unit() {
-    if (tr)
+    if (tr) {
         tr->remove(this);
+    }
 }
 
 void timer_unit::reset(timer& t, time_point_t tp) {
-    if (tr)
+    if (tr) {
         tr->remove(this);
+    }
+
     wpoint = tp;
     tr = &t;
     tr->add(this);
 }
 
 void timer_unit::reset(time_point_t tp) {
-    if (tr)
+    if (tr) {
         tr->remove(this);
+    }
+
     wpoint = tp;
     tr->add(this);
 }

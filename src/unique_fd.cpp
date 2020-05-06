@@ -1,7 +1,7 @@
 #include "unique_fd.h"
 
 unique_fd::unique_fd(int fd) noexcept
-    : fd_(fd)
+        : fd_(fd)
 {}
 
 unique_fd::~unique_fd() {
@@ -18,7 +18,7 @@ unique_fd& unique_fd::operator=(unique_fd&& rhs) noexcept {
     return *this;
 }
 
-int unique_fd::fd() const noexcept {
+int unique_fd::native_handle() const noexcept {
     return fd_;
 }
 

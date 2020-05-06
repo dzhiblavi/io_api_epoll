@@ -19,7 +19,7 @@ private:
         template <typename>
         struct result;
         template <typename F, typename... Args>
-        struct result<std::tuple<F, Args...>> : std::__invoke_result<F, Args...> {};
+        struct result<std::tuple<F, Args...>> : std::invoke_result<F, Args...> {};
 
     public:
         Tuple t;

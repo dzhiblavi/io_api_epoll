@@ -1,5 +1,5 @@
-#ifndef WEB_CRACKER_TIMER_H
-#define WEB_CRACKER_TIMER_H
+#ifndef NET_TIMER_H
+#define NET_TIMER_H
 
 #include <functional>
 #include <chrono>
@@ -11,7 +11,7 @@ class timer_unit;
 class timer {
 public:
     typedef std::chrono::steady_clock clock_t;
-    typedef clock_t::time_point       time_point_t;
+    typedef clock_t::time_point time_point_t;
 
 private:
     std::set<std::pair<time_point_t, timer_unit*>> timers;
@@ -31,7 +31,7 @@ class timer_unit {
 public:
     friend class timer;
     typedef std::function<void()> callback_t;
-    typedef timer::time_point_t   time_point_t;
+    typedef timer::time_point_t time_point_t;
 
 private:
     timer* tr = nullptr;
@@ -48,4 +48,4 @@ public:
     void callback();
 };
 
-#endif //WEB_CRACKER_TIMER_H
+#endif // NET_TIMER_H

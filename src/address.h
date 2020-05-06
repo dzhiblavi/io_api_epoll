@@ -1,5 +1,5 @@
-#ifndef WEB_CRACKER_ADDRESS_H
-#define WEB_CRACKER_ADDRESS_H
+#ifndef NET_ADDRESS_H
+#define NET_ADDRESS_H
 
 #include <cstdint>
 #include <string>
@@ -10,7 +10,6 @@
 #include <iostream>
 #include <arpa/inet.h>
 
-#include "ipv4_exception.h"
 #include "unique_fd.h"
 
 namespace ipv4 {
@@ -51,4 +50,4 @@ std::ostream& operator<<(std::ostream& os, address const& addr);
 std::ostream& operator<<(std::ostream& os, endpoint const& ep);
 } // namespace ipv4
 
-#endif //WEB_CRACKER_ADDRESS_H
+#endif // NET_ADDRESS_H

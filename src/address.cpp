@@ -1,10 +1,14 @@
 #include "address.h"
+#include "ipv4_error.h"
 
 namespace {
 uint32_t try_resolve(std::string const& host) {
     hostent* hst = gethostbyname(host.c_str());
-    if (hst == nullptr || hst->h_addr == nullptr)
+
+    if (hst == nullptr || hst->h_addr == nullptr) {
         IPV4_EXC("failed to resolve: " + host);
+    }
+
     uint32_t ret = 0;
     memcpy((char*)&ret, hst->h_addr, hst->h_length);
     return ret;
@@ -13,11 +17,11 @@ uint32_t try_resolve(std::string const& host) {
 
 namespace ipv4 {
 address::address(uint32_t addr) noexcept
-    : addr_(addr)
+        : addr_(addr)
 {}
 
 address::address(std::string const& host)
-    : addr_(try_resolve(host))
+        : addr_(try_resolve(host))
 {}
 
 address address::any() noexcept {
@@ -41,31 +45,34 @@ std::list<address> address::getaddrinfo(std::string const& hostname) {
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     std::list<address> ret;
-//    std::cerr << "GAI CALL" << std::endl;
     int r = ::getaddrinfo(hostname.c_str(), nullptr, &hints, &result);
-//    std::cerr << "GAI CALL END" << std::endl;
-    if (r)
-        throw ipv4::exception("address::getaddrinfo failed: " + std::string(gai_strerror(r)));
-    for (addrinfo* nd = result; nd != nullptr; nd = nd->ai_next)
+
+    if (r) {
+        IPV4_EXC("address::getaddrinfo failed: " + std::string(gai_strerror(r)));
+    }
+
+    for (addrinfo* nd = result; nd != nullptr; nd = nd->ai_next) {
         ret.emplace_back(reinterpret_cast<sockaddr_in *>(nd->ai_addr)->sin_addr.s_addr);
+    }
+
     freeaddrinfo(result);
     return ret;
 }
 
 
 endpoint::endpoint(uint32_t addr, uint16_t port) noexcept
-    : addr_(addr)
-    , port_(htons(port))
+        : addr_(addr)
+        , port_(htons(port))
 {}
 
 endpoint::endpoint(std::string const& host, uint16_t port)
-    : addr_(try_resolve(host))
-    , port_(htons(port))
+        : addr_(try_resolve(host))
+        , port_(htons(port))
 {}
 
 endpoint::endpoint(address const& addr, uint16_t port) noexcept
-    : addr_(addr.net_addr())
-    , port_(htons(port))
+        : addr_(addr.net_addr())
+        , port_(htons(port))
 {}
 
 uint32_t endpoint::net_addr() const noexcept {

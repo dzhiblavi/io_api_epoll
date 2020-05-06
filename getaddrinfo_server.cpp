@@ -1,4 +1,4 @@
-#include "getaddrinfo_server.h"
+ #include "getaddrinfo_server.h"
 
 namespace {
 std::mutex cerr_m;
@@ -108,7 +108,6 @@ getaddrinfo_server::client_connection_::worker_thread_::worker_thread_(client_co
     make_thread(GACHI_CONNECTION_THREAD_STACK_SIZE, &stack,
 #endif
     [this] {
-        // NOTE: noexcept loop [ok]
         for (;;) {
             is_working = false;
             std::unique_lock<std::mutex> lg(tm);
@@ -127,7 +126,7 @@ getaddrinfo_server::client_connection_::worker_thread_::worker_thread_(client_co
             try {
                 try {
                     res = form_response(hostname);
-                } catch (ipv4::exception const &e) {
+                } catch (ipv4::error const &e) {
                     res = fail_message(hostname, e.what());
                 } catch (...) {
                     res = fail_message(hostname, "unknown reason");
@@ -169,7 +168,7 @@ getaddrinfo_server::client_connection_::worker_thread_::~worker_thread_() {
     {
         std::unique_lock<std::mutex> lg(tm);
         quit = true;
-        kill(th.native_handle(), SIGINT);
+//        kill(th.native_handle(), SIGINT);
     }
     cv.notify_one();
     th.join();
@@ -206,6 +205,12 @@ void getaddrinfo_server::client_connection_::process_read() {
                 return;
             IPV4_EXC(std::to_string(errno));
         }
+#ifdef NET_POLL_POLL
+        if (r == 0) {
+            disconnect();
+            return;
+        }
+#endif
 
         int start_point = (int)saved_buff.size();
         saved_buff += std::string(buff, buff + r);
@@ -293,23 +298,27 @@ void getaddrinfo_server::client_connection_::reset_buffer() noexcept {
     sock.set_on_write({});
 }
 
+void getaddrinfo_server::client_connection_::disconnect() {
+#if GACHI_LOGLEVEL & 2
+    errlog("on_disconnect()");
+#endif
+    srv->cl.erase(this);
+}
+
 getaddrinfo_server::client_connection_::client_connection_(io_api::io_context& ctx, ipv4::getaddrinfo_server *server)
     : unique_id(gen_unique_id())
+    , srv(server)
     , sock(server->ssock.accept(
     // on_disconnect() : noexcept
-    [this, server] {
-#if GACHI_LOGLEVEL & 2
-        errlog("on_disconnect()");
-#endif
-        server->cl.erase(this);
+    [this] {
+        disconnect();
     },
     // on_read() : noexcept
-    [this, &ctx] {
+    [this] {
         process_read();
     }, {}))
     , w(this)
-    , timr(&ctx.get_timer(), timer::clock_t::now()
-                             + std::chrono::seconds(GACHI_TIMEOUT),
+    , timr(&ctx.get_timer(), timer::clock_t::now() + std::chrono::seconds(GACHI_TIMEOUT),
     // timer callback : noexcept
     [this, server, &ctx] {
 #if GACHI_LOGLEVEL & 2
@@ -340,8 +349,7 @@ getaddrinfo_server::getaddrinfo_server(io_api::io_context &ctx, const ipv4::endp
         auto cc = new client_connection_(ctx, this);
         cl.emplace(cc, std::unique_ptr<client_connection_>(cc));
     })
-    , s_control_(ctx, unique_fd(0), {})
-{
+    , s_control_(ctx, unique_fd(0), {}) {
     std::cout << "gachi_server#> " << std::flush;
 
     // assumed that s_control_ takes all control on stdout
