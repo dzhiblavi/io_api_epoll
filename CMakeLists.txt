@@ -32,5 +32,12 @@ add_executable(test test_main.cpp
         gtest/gtest_main.cc
         ${REQ_FILES})
 
-target_link_libraries(server -lpthread Ws2_32 Mswsock AdvApi32)
-target_link_libraries(test -lpthread Ws2_32 Mswsock AdvApi32)
+if (WIN32)
+    target_link_libraries(server -lpthread Ws2_32 Mswsock AdvApi32)
+    target_link_libraries(test -lpthread Ws2_32 Mswsock AdvApi32)
+endif (WIN32)
+
+if (UNIX)
+    target_link_libraries(server -lpthread)
+    target_link_libraries(test -lpthread)
+endif (UNIX)

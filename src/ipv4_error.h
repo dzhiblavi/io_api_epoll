@@ -17,7 +17,6 @@
                         + " on line: " + std::to_string(__LINE__) \
                         + ": " + std::to_string(gerrno))
 
-
 namespace ipv4 {
 class error : public std::runtime_error {
 public:
