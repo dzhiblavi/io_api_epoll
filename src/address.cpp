@@ -1,4 +1,3 @@
-#include <inaddr.h>
 #include "address.h"
 #include "ipv4_error.h"
 

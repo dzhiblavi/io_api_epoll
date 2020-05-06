@@ -2,24 +2,22 @@
 #include <vector>
 #include "socket.h"
 
+#if defined(__linux) || defined(__APPLE__)
+#include <sys/filio.h>
+#include <sys/ioctl.h>
+#endif
+
 namespace {
 #ifdef WIN32
 #define ioctl ioctlsocket
 #endif
 
-void set_nonblock(SOCKET handle) {
+void set_nonblock(ipv4::sock_fd_t handle) {
     unsigned long int on = 1;
     if (0 > ioctl(handle, FIONBIO, &on)) {
         IPV4_EXC();
     }
 }
-
-//void set_nonblock(ipv4::sock_fd_t fd) {
-//    int flags = fcntl(fd, F_GETFL, 0);
-//    if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK)) {
-//        IPV4_EXC();
-//    }
-//}
 
 void sock_enable_resuseaddr(ipv4::sock_fd_t fd) {
 #ifdef WIN32
