@@ -28,18 +28,18 @@ void io_context::exec() noexcept {
     for (;;) {
         if (quitf) return;
 
-//        std::cerr << "wait() start" << std::endl;
+        std::cerr << "wait start()" << std::endl;
         int nfd = p.wait(call_and_timeout());
+        std::cerr << "wait: " << nfd << std::endl;
 
         if (quitf) return;
 
         if (nfd < 0) {
-            if (errno != EINTR)
+            if (gerrno != EINTR)
                 std::cerr << "poll_wait() failed, errno = " << errno << std::endl;
             return;
         }
 
-//        std::cerr << "wait(): " << nfd << std::endl;
         for (auto it = p.begin(nfd); it != p.end(nfd); ++it) {
             if (quitf) return;
 

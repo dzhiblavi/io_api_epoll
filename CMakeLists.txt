@@ -20,7 +20,6 @@ set(REQ_FILES
         src/timer.h
         src/timer.cpp
         src/unique_fd.h
-        src/unique_fd.cpp
         src/poll.h
         src/poll.cpp)
 
@@ -33,5 +32,5 @@ add_executable(test test_main.cpp
         gtest/gtest_main.cc
         ${REQ_FILES})
 
-target_link_libraries(server -lpthread -lncurses)
-target_link_libraries(test -lpthread -lncurses)
+target_link_libraries(server -lpthread Ws2_32 Mswsock AdvApi32)
+target_link_libraries(test -lpthread Ws2_32 Mswsock AdvApi32)

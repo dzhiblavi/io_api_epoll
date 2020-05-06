@@ -1,3 +1,4 @@
+#include <inaddr.h>
 #include "address.h"
 #include "ipv4_error.h"
 
@@ -33,7 +34,13 @@ uint32_t address::net_addr() const noexcept {
 }
 
 std::string address::to_string() const {
-    return inet_ntoa(in_addr{net_addr()});
+#ifdef WIN32
+    in_addr addr{};
+    addr.S_un.S_addr = net_addr();
+#elif defined(__linux) || defined(__APPLE__)
+    in_addr addr{net_addr()};
+#endif
+    return inet_ntoa(addr);
 }
 
 address address::resolve(std::string const& host) {
@@ -84,7 +91,7 @@ uint16_t endpoint::port() const noexcept {
 }
 
 std::string endpoint::to_string() const {
-    return std::string(inet_ntoa(in_addr{net_addr()})) + ":" + std::to_string(port());
+    return address(net_addr()).to_string() + ":" + std::to_string(port());
 }
 
 std::ostream& operator<<(std::ostream& os, address const& addr) {

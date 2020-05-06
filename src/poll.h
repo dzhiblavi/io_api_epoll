@@ -1,15 +1,21 @@
 #ifndef WEB_CRACKER_POLL_H
 #define WEB_CRACKER_POLL_H
 
+#ifdef WIN32
+#define WINVER 0x0A00
+#define _WIN32_WINNT 0x0A00
+#include <ws2tcpip.h>
+#include <winsock2.h>
+#include <mstcpip.h>
+#include <windows.h>
+#endif
+
 #include <cstring>
 #include <cassert>
-#include <sys/poll.h>
 #include <array>
 #include <vector>
 #include <map>
 #include <queue>
-
-#include "unique_fd.h"
 
 #define NET_APPLE_POLL
 
@@ -27,13 +33,19 @@
 #include <sys/epoll.h>
 #elif defined(WIN32)
 #define NET_POLL_POLL
-#include <sys/poll.h>
-static inline int poll(pollfd *pfd, int nfds, int timeout) { return WSAPoll ( pfd, nfds, timeout ); }
+static inline int poll(pollfd *pfd, int nfds, int timeout) { return WSAPoll(pfd, nfds, timeout); }
 #endif
 
+#include "unique_fd.h"
 
 class poll {
 public:
+#ifdef WIN32
+    typedef SOCKET sock_fd_t;
+#elif defined(__linux) || defined(__APPLE__)
+    typedef int sock_fd_t;
+#endif
+
 #if defined(NET_POLL_KQUEUE) || defined(NET_POLL_EPOLL)
     typedef int native_handle_t;
 #endif
@@ -73,7 +85,6 @@ public:
         bool eof_ = false;
 #elif defined(NET_POLL_POLL)
         short events_ = 0;
-        bool eof_ = false;
 #endif
 
     public:
@@ -98,14 +109,14 @@ public:
 #if defined(NET_POLL_EPOLL)
         uint32_t events() const;
 #elif defined(NET_POLL_POLL)
-        short events() const;
+        [[nodiscard]] short events() const;
 #endif
     };
 
     friend struct event_info;
     struct event_info {
     private:
-        int fd_;
+        sock_fd_t fd_;
         void* data_;
         flag f_{};
 
@@ -120,7 +131,7 @@ public:
 
         event_info(event_info const& ev) = default;
 
-        [[nodiscard]] int fd() const;
+        [[nodiscard]] sock_fd_t fd() const;
 
         flag& get_flag();
 

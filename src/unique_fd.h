@@ -5,23 +5,42 @@
 #include <algorithm>
 #include <iostream>
 
+template <typename T, int(*cls)(T)>
 class unique_fd {
-    int fd_ = -1;
+    T fd{};
 
 public:
     unique_fd() noexcept = default;
-    explicit unique_fd(int fd) noexcept;
-    ~unique_fd();
+
+    explicit unique_fd(T fd) noexcept
+        : fd(fd) {}
+
+    ~unique_fd() {
+        cls(fd);
+    }
 
     unique_fd(unique_fd const&) = delete;
+
     unique_fd& operator=(unique_fd const&) = delete;
 
-    unique_fd(unique_fd&&) noexcept;
-    unique_fd& operator=(unique_fd&&) noexcept;
+    unique_fd(unique_fd&& uf) noexcept
+        : fd(uf.fd) {
+        uf.fd = T{};
+    }
 
-    [[nodiscard]] int native_handle() const noexcept;
+    unique_fd& operator=(unique_fd&& uf) noexcept {
+        if (this != &uf)
+            std::swap(fd, uf.fd);
+        return *this;
+    }
 
-    friend void swap(unique_fd&, unique_fd&) noexcept;
+    [[nodiscard]] int native_handle() const noexcept {
+        return fd;
+    }
+
+    friend void swap(unique_fd& u1, unique_fd& u2) noexcept {
+        std::swap(u1.fd, u2.fd);
+    }
 };
 
 #endif // NET_UNIQUE_FD_H

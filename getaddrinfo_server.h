@@ -10,20 +10,19 @@
 #include <atomic>
 #include <condition_variable>
 #include <unistd.h>
-#include <term.h>
 
 #include "src/address.h"
 #include "src/io_api.h"
 #include "src/socket.h"
 #include "src/timer.h"
 
-#include "dthread/dthread.h"
 
 //#define GACHI_USE_DTHREAD
 #define GACHI_BUFFSIZE 128
 #define GACHI_TIMEOUT 10
 
 #ifdef GACHI_USE_DTHREAD
+#include "dthread/dthread.h"
 #define GACHI_CONNECTION_THREAD_STACK_SIZE 50
 #endif
 
@@ -41,7 +40,9 @@ class getaddrinfo_server {
 private:
     server_socket ssock;
     std::map<client_connection_*, std::unique_ptr<client_connection_>> cl;
+#ifdef TERM_CONTROL
     ipv4::socket s_control_;
+#endif
 
 public:
     getaddrinfo_server(io_api::io_context&, endpoint const&);

@@ -4,9 +4,13 @@
 #define SSOCK_MAX_LISTEN 20000
 
 #include <functional>
-#include <sys/socket.h>
 #include <cstring>
 #include <cassert>
+
+#ifdef WIN32
+#elif defined(__linux) || defined(__APPLE__)
+#include <sys/socket.h>
+#endif
 
 #include "ipv4_error.h"
 #include "unique_fd.h"
@@ -14,12 +18,26 @@
 #include "io_api.h"
 
 namespace ipv4 {
+#ifdef WIN32
+    typedef SOCKET sock_fd_t;
+#define NET_SOCK_CLOSE closesocket
+#define NET_BUFF_PTR char*
+#define NET_BUFF_CPTR char const*
+#elif defined(__linux) || defined(__APPLE__)
+    typedef int sock_fd_t;
+#define NET_SOCK_CLOSE close;
+#define NET_BUFF_PTR void*
+#define NET_BUFF_CPTR void const*
+#endif
+
+typedef unique_fd<sock_fd_t, NET_SOCK_CLOSE> sock_ufd;
+
 class basic_socket {
 protected:
-    unique_fd fd_;
+    sock_ufd fd_;
 
 protected:
-    explicit basic_socket(unique_fd&&);
+    explicit basic_socket(sock_ufd&&);
 
 public:
     explicit basic_socket(endpoint const& ep);
@@ -32,9 +50,9 @@ public:
 
     basic_socket& operator=(basic_socket&&) noexcept = default;
 
-    int recv(void* buff, size_t max_len) noexcept;
+    int recv(NET_BUFF_PTR buff, size_t max_len) noexcept;
 
-    int send(void const* buff, size_t max_len) noexcept;
+    int send(NET_BUFF_CPTR buff, size_t max_len) noexcept;
 };
 
 class socket : private basic_socket {
@@ -51,14 +69,14 @@ private:
     bool *destroyed_ = nullptr;
 
 private:
-    poll::flag events_() const noexcept;
+    [[nodiscard]] poll::flag events_() const noexcept;
 
     [[nodiscard]] std::function<void(poll::flag const&)> configure_callback_() noexcept;
 
 public:
-    socket(io_api::io_context& ctx, unique_fd&& fd, callback_t const& on_disconnect);
+    socket(io_api::io_context& ctx, sock_ufd&& fd, callback_t const& on_disconnect);
 
-    socket(io_api::io_context& ctx, unique_fd&& fd, callback_t on_disconnect
+    socket(io_api::io_context& ctx, sock_ufd&& fd, callback_t on_disconnect
             , callback_t on_read
             , callback_t on_write);
 
@@ -104,7 +122,7 @@ public:
     typedef std::function<void()> callback_t;
 
 private:
-    unique_fd fd_;
+    sock_ufd fd_;
     callback_t on_connected_;
     io_api::io_unit unit_;
 

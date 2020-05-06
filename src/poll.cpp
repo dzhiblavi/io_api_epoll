@@ -38,8 +38,9 @@ void register_event(int pfd, poll::event* ev, int16_t filter) {
 
 #ifdef NET_POLL_POLL
 int sysapi_poll(poll::event* ev, int size, int wait) {
+    std::cerr << size << ' ' << wait << std::endl;
     int r = ::poll(ev, size, wait);
-    if (r == -1 && errno != EINTR)
+    if (r == -1 && gerrno != EINTR)
         IPV4_EXC();
     return r ? size : 0;
 }
@@ -128,7 +129,7 @@ poll::flag const& poll::event_info::get_flag() const {
     return f_;
 }
 
-int poll::event_info::fd() const {
+poll::sock_fd_t poll::event_info::fd() const {
     return fd_;
 }
 
@@ -289,7 +290,7 @@ void poll::flag::set_write(bool set) {
 }
 
 void poll::flag::set_eof(bool set) {
-    eof_ = set;
+//    events_ = setif(events_, POLLHUP, set);
 }
 
 bool poll::flag::read() const {
@@ -301,7 +302,7 @@ bool poll::flag::write() const {
 }
 
 bool poll::flag::eof() const {
-    return eof_;
+    return events_ & POLLHUP;
 }
 
 short poll::flag::events() const {
