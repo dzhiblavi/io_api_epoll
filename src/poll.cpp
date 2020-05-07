@@ -38,7 +38,6 @@ void register_event(int pfd, poll::event* ev, int16_t filter) {
 
 #ifdef NET_POLL_POLL
 int sysapi_poll(poll::event* ev, int size, int wait) {
-    std::cerr << size << ' ' << wait << std::endl;
     int r = ::poll(ev, size, wait);
     if (r == -1 && gerrno != EINTR)
         IPV4_EXC();

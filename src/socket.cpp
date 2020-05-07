@@ -133,7 +133,6 @@ poll::flag socket::events_() const noexcept {
 
 std::function<void(poll::flag const&)> socket::configure_callback_() noexcept {
     return [this](poll::flag const& ev) {
-        std::cerr << "callback!" << std::endl;
         bool cur_destroyed = false;
         bool* old_destroyed = destroyed_;
         destroyed_ = &cur_destroyed;

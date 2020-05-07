@@ -28,9 +28,9 @@ void io_context::exec() noexcept {
     for (;;) {
         if (quitf) return;
 
-        std::cerr << "wait start()" << std::endl;
+//        std::cerr << "wait start()" << std::endl;
         int nfd = p.wait(call_and_timeout());
-        std::cerr << "wait: " << nfd << std::endl;
+//        std::cerr << "wait: " << nfd << std::endl;
 
         if (quitf) return;
 
