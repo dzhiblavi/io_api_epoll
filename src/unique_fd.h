@@ -7,28 +7,28 @@
 
 template <typename T, int(*cls)(T)>
 class unique_fd {
-    T fd{};
+    T fd = -1;
 
 public:
     unique_fd() noexcept = default;
 
     explicit unique_fd(T fd) noexcept
-        : fd(fd) {}
+            : fd(fd) {}
 
     ~unique_fd() {
         cls(fd);
     }
 
-    unique_fd(unique_fd const&) = delete;
+    unique_fd(unique_fd const &) = delete;
 
-    unique_fd& operator=(unique_fd const&) = delete;
+    unique_fd &operator=(unique_fd const &) = delete;
 
-    unique_fd(unique_fd&& uf) noexcept
+    unique_fd(unique_fd &&uf) noexcept
         : fd(uf.fd) {
-        uf.fd = T{};
+        uf.fd = -1;
     }
 
-    unique_fd& operator=(unique_fd&& uf) noexcept {
+    unique_fd &operator=(unique_fd &&uf) noexcept {
         if (this != &uf)
             std::swap(fd, uf.fd);
         return *this;

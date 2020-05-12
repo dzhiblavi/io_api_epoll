@@ -25,7 +25,7 @@ namespace ipv4 {
 #define NET_BUFF_CPTR char const*
 #elif defined(__linux) || defined(__APPLE__)
     typedef int sock_fd_t;
-#define NET_SOCK_CLOSE close
+#define NET_SOCK_CLOSE ::close
 #define NET_BUFF_PTR void*
 #define NET_BUFF_CPTR void const*
 #endif
